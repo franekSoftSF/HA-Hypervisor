@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir . \
     && chown agent /data
 
 USER agent
+ENV HA_HYPERVISOR_CONFIG=/config/config.yaml
 VOLUME ["/data"]
 ENTRYPOINT ["ha-hypervisor-agent"]
 CMD ["run", "--config", "/config/config.yaml"]

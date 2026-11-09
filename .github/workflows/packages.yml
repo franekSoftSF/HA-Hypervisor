@@ -1,0 +1,37 @@
+name: Packages
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  deb:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.release.tag_name || github.ref }}
+      - name: Build
+        run: |
+          mkdir -p dist
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/dist:/out" python:3.14-slim sh /src/packaging/deb/build.sh
+      - name: Install and run
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          ha-hypervisor-agent --version
+          ha-hypervisor-agent genkey
+          sudo ha-hypervisor-agent init --agent-id ci
+          sudo ha-hypervisor-agent show
+      - name: Attach to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/* --clobber

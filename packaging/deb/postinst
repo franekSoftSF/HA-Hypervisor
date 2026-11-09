@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+NAME=ha-hypervisor-agent
+
+if [ "$1" = "configure" ]; then
+    if ! getent passwd "$NAME" >/dev/null; then
+        adduser --system --group --quiet --no-create-home --home "/var/lib/$NAME" "$NAME"
+    fi
+    install -d -m 0750 -o root -g "$NAME" "/etc/$NAME"
+    install -d -m 0750 -o "$NAME" -g "$NAME" "/var/lib/$NAME"
+
+    if [ -d /run/systemd/system ]; then
+        systemctl daemon-reload || true
+        # Enabled but not started: it needs a configuration first.
+        systemctl enable "$NAME.service" >/dev/null 2>&1 || true
+        if [ -n "${2:-}" ]; then
+            systemctl try-restart "$NAME.service" || true
+        fi
+    fi
+fi
+
+exit 0

@@ -17,6 +17,11 @@ T = TypeVar("T")
 _ENV = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _MAC = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$")
 
+DEFAULT_CONFIG = os.environ.get(
+    "HA_HYPERVISOR_CONFIG", "/etc/ha-hypervisor-agent/config.yaml"
+)
+PACKAGE_STATE_FILE = "/var/lib/ha-hypervisor-agent/state.json"
+
 
 class ConfigError(ValueError):
     """The configuration file is not usable."""
@@ -191,18 +196,56 @@ def _validate(config: AgentConfig) -> None:
         raise ConfigError("agent_id: use lowercase letters, digits, - and _")
     if not is_valid_key(config.shared_key):
         raise ConfigError("shared_key: too short, run the genkey command")
-    if config.mqtt.transport not in ("tcp", "websockets"):
-        raise ConfigError("mqtt.transport: use tcp or websockets")
+    _validate_mqtt(config.mqtt)
     if not config.hosts:
         raise ConfigError("hosts: at least one host is required")
     names = [host.name for host in config.hosts]
     if len(set(names)) != len(names):
         raise ConfigError("hosts: names must be unique")
     for host in config.hosts:
-        if host.bmc is not None and host.bmc.type not in ("auto", "redfish", "ipmi"):
-            raise ConfigError(f"hosts.{host.name}.bmc.type: use auto, redfish or ipmi")
-        if host.wol is not None and not _MAC.match(host.wol.mac):
-            raise ConfigError(f"hosts.{host.name}.wol.mac: invalid MAC address")
+        _validate_host(host)
+
+
+def _validate_mqtt(settings: MqttConfig) -> None:
+    if settings.transport not in ("tcp", "websockets"):
+        raise ConfigError("mqtt.transport: use tcp or websockets")
+
+
+def _validate_host(host: HostConfig) -> None:
+    if host.bmc is not None and host.bmc.type not in ("auto", "redfish", "ipmi"):
+        raise ConfigError(f"hosts.{host.name}.bmc.type: use auto, redfish or ipmi")
+    if host.wol is not None and not _MAC.match(host.wol.mac):
+        raise ConfigError(f"hosts.{host.name}.wol.mac: invalid MAC address")
+
+
+def expand(raw: Any) -> Any:
+    """Replace ${ENV} references with their values."""
+    return _expand(raw)
+
+
+def build_mqtt(raw: Any) -> MqttConfig:
+    """Validate the mqtt section alone."""
+    settings = _build(MqttConfig, raw, "mqtt")
+    _validate_mqtt(settings)
+    return settings
+
+
+def build_vcenter(raw: Any) -> VCenterConfig:
+    """Validate the vcenter section alone."""
+    return _build(VCenterConfig, raw, "vcenter")
+
+
+def build_host(raw: Any) -> HostConfig:
+    """Validate one entry of the hosts section."""
+    host = _build(
+        HostConfig,
+        raw,
+        "host",
+        bmc=_optional(BmcConfig, raw, "bmc", "host"),
+        wol=_optional(WolConfig, raw, "wol", "host"),
+    )
+    _validate_host(host)
+    return host
 
 
 def load(path: str | Path) -> AgentConfig:

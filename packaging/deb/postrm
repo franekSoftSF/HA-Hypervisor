@@ -1,0 +1,24 @@
+#!/bin/sh
+set -e
+
+NAME=ha-hypervisor-agent
+
+case "$1" in
+    remove)
+        if [ -d /run/systemd/system ]; then
+            systemctl daemon-reload || true
+        fi
+        ;;
+    purge)
+        # The configuration holds the passwords, purge has to take it away.
+        rm -rf "/etc/$NAME" "/var/lib/$NAME"
+        if getent passwd "$NAME" >/dev/null; then
+            deluser --system --quiet "$NAME" >/dev/null 2>&1 || true
+        fi
+        if getent group "$NAME" >/dev/null; then
+            delgroup --system --quiet "$NAME" >/dev/null 2>&1 || true
+        fi
+        ;;
+esac
+
+exit 0

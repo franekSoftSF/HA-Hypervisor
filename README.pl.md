@@ -48,7 +48,7 @@ Przykład powyższego panelu jest w [docs/dashboard.example.yaml](docs/dashboard
 W skrócie, według [instrukcji instalacji](docs/pl/installation.md):
 
 1. Mosquitto z osobnym kontem dla agenta.
-2. Agent w Dockerze na urządzeniu poza klastrem, sprawdzony poleceniem `check`.
+2. Agent jako paczka `.deb` (Debian, Ubuntu, amd64 i arm64) albo w Dockerze, na urządzeniu poza klastrem. Połączenia z MQTT, vCenter i ESXi dodajesz przez CLI i sprawdzasz poleceniem `check`.
 3. W **Ustawienia, Marketplace, Add from link** podaj to repozytorium, zainstaluj **HA Hypervisor** i dodaj integrację. HACS nie jest potrzebny: Home Assistant 2026.11 zastąpił go wbudowanym Marketplace.
 
 ## Wyłączanie klastra

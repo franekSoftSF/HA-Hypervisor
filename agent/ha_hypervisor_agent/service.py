@@ -11,7 +11,7 @@ from typing import Any
 import paho.mqtt.client as mqtt
 
 from . import __version__
-from .config import AgentConfig
+from .config import AgentConfig, MqttConfig
 from .inventory import build_state, build_view, remember
 from .operations import Busy, OperationFailed, Orchestrator
 from .protocol import (
@@ -52,6 +52,55 @@ _OPERATIONS = (
     CMD_SCENARIO_START,
     CMD_SCENARIO_STOP,
 )
+
+
+def create_mqtt_client(settings: MqttConfig, client_id: str) -> mqtt.Client:
+    """Return a client with the transport, TLS and login of the settings."""
+    client = mqtt.Client(
+        mqtt.CallbackAPIVersion.VERSION2,
+        client_id=client_id,
+        transport=settings.transport,
+        # Never let the broker queue commands for an offline agent.
+        clean_session=True,
+    )
+    if settings.transport == "websockets":
+        client.ws_set_options(path=settings.path)
+    if settings.tls:
+        client.tls_set(ca_certs=settings.ca_file)
+        client.tls_insecure_set(not settings.verify_tls)
+    if settings.username:
+        client.username_pw_set(settings.username, settings.password)
+    return client
+
+
+def test_mqtt(settings: MqttConfig, agent_id: str, timeout: float = 10) -> str | None:
+    """Try to log in to the broker, return the problem or None.
+
+    The client id differs from the agent's, otherwise the broker would
+    disconnect an agent that is already running.
+    """
+    client = create_mqtt_client(settings, f"ha_hypervisor_agent_{agent_id}_test")
+    done = threading.Event()
+    problem: list[str] = []
+
+    def connected(_client, _userdata, _flags, reason_code, _properties) -> None:  # noqa: ANN001
+        if reason_code.is_failure:
+            problem.append(str(reason_code))
+        done.set()
+
+    client.on_connect = connected
+    try:
+        client.connect(settings.host, settings.port, keepalive=15)
+    except (OSError, ValueError) as err:
+        return str(err) or type(err).__name__
+    client.loop_start()
+    try:
+        if not done.wait(timeout):
+            return "no answer from the broker"
+    finally:
+        client.disconnect()
+        client.loop_stop()
+    return problem[0] if problem else None
 
 
 class ReplayGuard:
@@ -95,20 +144,9 @@ class AgentService:
 
     def _build_client(self) -> mqtt.Client:
         settings = self._config.mqtt
-        client = mqtt.Client(
-            mqtt.CallbackAPIVersion.VERSION2,
-            client_id=f"ha_hypervisor_agent_{self._config.agent_id}",
-            transport=settings.transport,
-            # Never let the broker queue commands for an offline agent.
-            clean_session=True,
+        client = create_mqtt_client(
+            settings, f"ha_hypervisor_agent_{self._config.agent_id}"
         )
-        if settings.transport == "websockets":
-            client.ws_set_options(path=settings.path)
-        if settings.tls:
-            client.tls_set(ca_certs=settings.ca_file)
-            client.tls_insecure_set(not settings.verify_tls)
-        if settings.username:
-            client.username_pw_set(settings.username, settings.password)
         client.will_set(
             self._topic(LEAF_STATUS), STATUS_OFFLINE, qos=_QOS, retain=True
         )
@@ -263,6 +301,13 @@ def check(config: AgentConfig) -> int:
     """Read-only test of every connection, printing one line for each."""
     infra = Infra(config)
     failures = 0
+    problem = test_mqtt(config.mqtt, config.agent_id)
+    if problem:
+        failures += 1
+        print(f"FAIL  MQTT {config.mqtt.host}: {problem}")  # noqa: T201
+    else:
+        print(f"OK    MQTT {config.mqtt.host}")  # noqa: T201
+
     try:
         client = infra.vcenter()
         print(f"OK    vCenter {config.vcenter.host}: {client.version}")  # noqa: T201

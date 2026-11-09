@@ -17,7 +17,7 @@ Home Assistant + integracja  <->  Mosquitto  <--MQTT po TLS--  agent
 | Co | Szczegóły |
 |---|---|
 | Home Assistant | 2026.11 lub nowszy, z integracją MQTT. HACS nie jest potrzebny, zastąpił go wbudowany Marketplace |
-| Urządzenie dla agenta | Zawsze włączone, **poza klastrem**, w sieci zarządzania vCenter, z Dockerem. Raspberry Pi, mini PC albo VM na innym sprzęcie |
+| Urządzenie dla agenta | Zawsze włączone, **poza klastrem**, w sieci zarządzania vCenter, z Debianem lub Ubuntu (albo Dockerem). Raspberry Pi, mini PC albo VM na innym sprzęcie |
 | Sieć od agenta | vCenter i każdy ESXi na 443, każdy BMC na 443 i 623/udp, broker |
 | Zegar | NTP na agencie i na Home Assistancie. Polecenie wygasa po dwóch minutach |
 | Hosty | Nazwy dokładnie takie jak w vCenter |
@@ -136,50 +136,121 @@ agent musi być w tym samym segmencie sieci, a działania nie da się sprawdzić
 
 ## 5. Agent
 
+### Instalacja paczki
+
+Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64 (także Raspberry Pi). Paczka ma własnego
+Pythona i nie rusza systemowego.
+
+```bash
+VERSION=0.3.0
+ARCH=$(dpkg --print-architecture)
+wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
+sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
+```
+
+Usługa jest włączona, ale czeka na konfigurację.
+
+### Konfiguracja połączeń
+
+Utwórz konfigurację. Polecenie wypisze **ID agenta i klucz współdzielony**, potrzebne później w Home Assistancie:
+
+```bash
+sudo ha-hypervisor-agent init --agent-id lab
+```
+
+MQTT, dla opcji A z sekcji 2. Dla opcji B użyj `--transport tcp --port 8883`:
+
+```bash
+sudo ha-hypervisor-agent mqtt set --host mqtt.example.com --transport websockets --username ha-hypervisor-agent
+```
+
+```bash
+sudo ha-hypervisor-agent mqtt test
+```
+
+vCenter. `--vm-name` to nazwa maszyny vCenter, jeśli działa na zarządzanych hostach:
+
+```bash
+sudo ha-hypervisor-agent vcenter set --host vcenter.lab.local --username svc-ha@vsphere.local --vm-name "VMware vCenter Server"
+```
+
+```bash
+sudo ha-hypervisor-agent vcenter test
+```
+
+Test pokazuje też hosty znane vCenter, więc widać dokładne nazwy do użycia poniżej. Dodaj każdy host ESXi razem z jego
+BMC:
+
+```bash
+sudo ha-hypervisor-agent esxi add esxi01.lab.local --username svc-ha --bmc-address 10.0.0.21 --bmc-username ADMIN
+```
+
+```bash
+sudo ha-hypervisor-agent esxi test
+```
+
+O hasła polecenia pytają interaktywnie, nigdy nie podaje się ich jako argumentów. Potem sprawdź całość i uruchom:
+
+```bash
+sudo ha-hypervisor-agent check
+```
+
+```bash
+sudo systemctl start ha-hypervisor-agent
+```
+
+```bash
+journalctl -u ha-hypervisor-agent -f
+```
+
+Każdy wiersz `check` powinien zaczynać się od `OK`. `WARN` oznacza, że BMC nie odpowiedział i został tylko Wake on LAN,
+którego nie da się sprawdzić. W logu powinien pojawić się wpis `Connected to the broker`.
+
+### Lista poleceń
+
+| Polecenie | Do czego |
+|---|---|
+| `init --agent-id NAZWA` | Tworzy konfigurację i klucz współdzielony |
+| `show` | Pokazuje konfigurację bez sekretów i czego jeszcze brakuje |
+| `check` | Sprawdza wszystkie połączenia, niczego nie zmienia |
+| `key show`, `key rotate` | Pokazuje lub wymienia klucz współdzielony |
+| `mqtt set`, `mqtt test` | Połączenie z brokerem |
+| `vcenter set`, `vcenter test` | Połączenie z vCenter |
+| `esxi add NAZWA`, `esxi add NAZWA --update` | Dodaje lub zmienia host |
+| `esxi list`, `esxi remove NAZWA`, `esxi test [NAZWA]` | Lista, usuwanie i test hostów |
+
+Każde polecenie ma `--help`. Opcje `esxi add` to m.in. `--address`, `--bmc-type`, `--wol-mac`, `--wol-broadcast`,
+`--no-bmc` i `--no-wol`.
+
+Po zmianie konfiguracji uruchom usługę ponownie: `sudo systemctl restart ha-hypervisor-agent`.
+
+W skryptach `--password-stdin` czyta hasło ze standardowego wejścia (`esxi add` czyta najpierw hasło ESXi, a potem hasło
+BMC z `--bmc-password-stdin`). `--password-env NAZWA` zapisuje tylko odwołanie, a wartość trzymasz w
+`/etc/ha-hypervisor-agent/agent.env`, który wczytuje usługa.
+
+Konfiguracja jest w `/etc/ha-hypervisor-agent/config.yaml`, dostępna tylko dla roota i agenta.
+`apt purge ha-hypervisor-agent` usuwa ją razem z hasłami.
+
+### Alternatywa: Docker
+
 ```bash
 git clone https://github.com/franekSoftSF/HA-Hypervisor.git
 cd HA-Hypervisor/agent
 cp config.example.yaml config.yaml
 cp .env.example .env
 chmod 600 .env config.yaml
-```
-
-Utwórz klucz współdzielony i wpisz go do `.env` jako `HA_HYPERVISOR_SHARED_KEY`, razem z hasłami:
-
-```bash
 docker compose -f docker-compose.example.yml run --rm ha-hypervisor-agent genkey
 ```
 
-Uzupełnij `config.yaml`:
-
-| Ustawienie | Wartość |
-|---|---|
-| `agent_id` | Krótka nazwa małymi literami, np. `lab` |
-| `mqtt` | Opcja A: `transport: websockets`, `port: 443`, `path: /mqtt`. Opcja B: `transport: tcp`, `port: 8883` |
-| `vcenter.vm_name` | Nazwa maszyny vCenter, jeśli działa na podanych hostach |
-| `hosts[].name` | **Dokładnie** taka jak w vCenter |
-| `hosts[].address` | Adres ESXi używany przez agenta |
-| `hosts[].bmc` | Adres i konto BMC |
-| `protected_vms` | Maszyny, które blokują wyłączenie klastra, gdy działają |
-
-Sprawdź wszystkie połączenia. To niczego nie zmienia:
+Klucz i hasła wpisz do `.env`, uzupełnij `config.yaml`, a potem:
 
 ```bash
 docker compose -f docker-compose.example.yml run --rm ha-hypervisor-agent check --config /config/config.yaml
 ```
 
-Każdy wiersz powinien zaczynać się od `OK`. `WARN` oznacza, że BMC nie odpowiedział i został tylko Wake on LAN, którego
-nie da się sprawdzić. Następnie uruchom agenta:
-
 ```bash
 docker compose -f docker-compose.example.yml up -d
 ```
-
-```bash
-docker compose -f docker-compose.example.yml logs -f
-```
-
-W logu powinien pojawić się wpis `Connected to the broker`.
 
 ## 6. Home Assistant
 
@@ -223,7 +294,8 @@ Idź krok po kroku, najlepiej gdy masz fizyczny dostęp do serwera:
 |---|---|
 | Agent nie został znaleziony przy dodawaniu integracji | Agent działa, ma w logu `Connected to the broker`, a HA używa tego samego brokera |
 | Inny klucz przy dodawaniu integracji | Ten sam `shared_key` w `.env` i w Home Assistancie |
-| Akcje kończą się „Agent nie odpowiedział” | Zegary po obu stronach (NTP), wpis `Rejected command` w logu agenta |
+| `is not a valid app repository` | To sklep aplikacji. Integracje dodaje się w **Ustawienia, Marketplace, Add from link** |
+| Akcje kończą się  | Zegary po obu stronach (NTP), wpis `Rejected command` w logu agenta |
 | `Not authorised` w logu agenta | Konto i ACL brokera, `agent_id` w ACL |
 | `no_wake_method` w podglądzie | BMC nie odpowiada: uruchom `check` |
 | `esxi_unavailable` w podglądzie | Konto ESXi, tryb lockdown, port 443 od agenta |
@@ -232,9 +304,5 @@ Idź krok po kroku, najlepiej gdy masz fizyczny dostęp do serwera:
 
 ## Aktualizacja
 
-Integracja: przez Marketplace. Agent:
-
-```bash
-git pull
-docker compose -f docker-compose.example.yml up -d --build
-```
+Integracja: przez Marketplace. Agent: zainstaluj nową paczkę przez `apt install`, konfiguracja zostaje. W Dockerze:
+`git pull` i `docker compose -f docker-compose.example.yml up -d --build`.

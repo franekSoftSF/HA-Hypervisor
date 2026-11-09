@@ -7,7 +7,8 @@ Polish translations next to English ones.
 ## Layout
 - `custom_components/ha_hypervisor/` - integration. `link.py` is the MQTT side, scenarios are config subentries.
 - `agent/ha_hypervisor_agent/` - agent: `vim.py` (vSphere), `power.py` (Redfish, IPMI, WOL), `inventory.py` (state),
-  `operations.py` (sequences), `service.py` (MQTT), `store.py` (what survives the cluster being off).
+  `operations.py` (sequences), `service.py` (MQTT), `store.py` (what survives the cluster being off), `cli.py` (commands).
+- `packaging/deb/` - the .deb with its own Python, built by `.github/workflows/packages.yml` for every release.
 - `tests/agent`, `tests/integration`, `tests/e2e`.
 
 ## Rules
@@ -18,8 +19,9 @@ Polish translations next to English ones.
 - New error code or step: add to `protocol.py` and to both translation files (tested).
 - Everything that can fail must fail in preflight, before anything is stopped. Never force off the vCenter VM.
 - Flows must use `async_update_and_abort`: the entry has an update listener, reloading methods are an error from 2026.12.
+- Passwords are never command line arguments: prompt, stdin or an environment reference.
 - Never run `python` on the Windows dev PC (Store stub hangs). Everything runs in Docker.
 - In `vim.py` read leaf properties through the property collector, not whole objects such as `vm.runtime`.
 
 ## Verification
-`.\tests\run.ps1 -E2E`. Not testable locally: real ESXi shutdown, BMC power on, vCLS Retreat on a real cluster, WOL.
+`.\tests\run.ps1 -E2E` and, for packaging or CLI changes, `.\tests\run-deb.ps1`. Not testable locally: real ESXi shutdown, BMC power on, vCLS Retreat on a real cluster, WOL.

@@ -49,7 +49,7 @@ An example of the dashboard above is in [docs/dashboard.example.yaml](docs/dashb
 In short, following the [installation guide](docs/installation.md):
 
 1. Mosquitto with a separate account for the agent.
-2. The agent in Docker on a machine outside the cluster, tested with its `check` command.
+2. The agent as a `.deb` package (Debian, Ubuntu, amd64 and arm64) or in Docker, on a machine outside the cluster. Connections to MQTT, vCenter and ESXi are added with its CLI and verified with `check`.
 3. In **Settings, Marketplace, Add from link** enter this repository, install **HA Hypervisor**, and add the integration. HACS is not used: Home Assistant 2026.11 replaced it with the built-in Marketplace.
 
 ## Shutting the cluster down
