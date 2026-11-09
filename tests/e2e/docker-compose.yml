@@ -1,0 +1,46 @@
+# Full path on a real Home Assistant: broker, simulated vCenter, agent, driver.
+# Test-only values, nothing here is used outside this stack.
+name: ha-vmware-e2e
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+
+  vcsim:
+    image: vmware/vcsim:latest
+    command: ["-l", "0.0.0.0:443", "-cluster", "1", "-host", "1", "-standalone-host", "0", "-vm", "3", "-dc", "1", "-ds", "1"]
+
+  esxi:
+    image: vmware/vcsim:latest
+    command: ["-l", "0.0.0.0:443", "-esx", "-vm", "1", "-ds", "1"]
+
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    volumes:
+      - ../../custom_components:/config/custom_components:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8123/manifest.json"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  agent:
+    build: ../../agent
+    depends_on: [mosquitto, vcsim]
+    volumes:
+      - ./agent-config.yaml:/config/config.yaml:ro
+
+  driver:
+    image: ha-vmware-test-agent
+    profiles: [driver]
+    depends_on:
+      homeassistant:
+        condition: service_healthy
+    volumes:
+      - ../..:/src:ro
+    environment:
+      PYTHONPATH: /src/agent
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["python", "/src/tests/e2e/driver.py"]

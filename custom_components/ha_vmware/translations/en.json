@@ -1,0 +1,234 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to the agent",
+        "description": "Start the agent first. The MQTT integration must use the same broker as the agent.",
+        "data": { "agent_id": "Agent ID", "shared_key": "Shared key" },
+        "data_description": {
+          "agent_id": "The agent_id value from the agent configuration.",
+          "shared_key": "The shared_key value from the agent configuration."
+        }
+      },
+      "reconfigure": {
+        "title": "Replace the shared key",
+        "data": { "shared_key": "Shared key" }
+      }
+    },
+    "error": {
+      "mqtt_not_ready": "The MQTT integration is not connected.",
+      "agent_not_found": "No agent with this ID answered. Check that it is running and connected to the same broker.",
+      "invalid_key": "The agent is signing with a different key.",
+      "invalid_key_format": "The key is too short, create one with the genkey command.",
+      "invalid_agent_id": "Use lowercase letters, digits, - and _.",
+      "protocol": "The agent uses a different protocol version, update it."
+    },
+    "abort": {
+      "already_configured": "This agent is already configured.",
+      "reconfigure_successful": "The key was replaced."
+    }
+  },
+  "config_subentries": {
+    "scenario": {
+      "entry_type": "Scenario",
+      "initiate_flow": { "user": "Add scenario" },
+      "step": {
+        "user": {
+          "title": "New scenario",
+          "data": {
+            "name": "Name",
+            "power_off_empty_hosts": "Power off hosts left empty when stopping"
+          }
+        },
+        "reconfigure": {
+          "title": "Edit scenario",
+          "data": {
+            "name": "Name",
+            "power_off_empty_hosts": "Power off hosts left empty when stopping"
+          }
+        },
+        "group": {
+          "title": "Group {number}",
+          "description": "VMs in a group start together. The next group waits until this one is ready.",
+          "data": {
+            "vms": "Virtual machines",
+            "wait": "Ready when",
+            "delay": "Extra delay after the group",
+            "timeout": "Time limit",
+            "add_another": "Add another group"
+          }
+        }
+      },
+      "error": { "no_vms_selected": "Select at least one VM." },
+      "abort": {
+        "no_vms_known": "The agent has not reported any VMs yet.",
+        "reconfigure_successful": "The scenario was saved."
+      }
+    }
+  },
+  "selector": {
+    "wait_mode": {
+      "options": {
+        "none": "Do not wait",
+        "power": "VM is powered on",
+        "tools": "VMware Tools respond"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "agent_online": { "name": "Agent" },
+      "host_connected": { "name": "Connection" },
+      "vcenter_reachable": { "name": "vCenter" },
+      "vm_tools": { "name": "VMware Tools" }
+    },
+    "button": {
+      "cancel_operation": { "name": "Cancel operation" },
+      "cluster_shutdown": { "name": "Shut down cluster" },
+      "cluster_start": { "name": "Start cluster" },
+      "refresh": { "name": "Refresh" },
+      "scenario_start": { "name": "Start" },
+      "scenario_stop": { "name": "Stop" },
+      "shutdown_preview": { "name": "Preview shutdown" },
+      "vm_force_off": { "name": "Force power off" }
+    },
+    "sensor": {
+      "cluster_cpu_percent": { "name": "CPU usage" },
+      "cluster_memory_percent": { "name": "Memory usage" },
+      "cluster_state": {
+        "name": "Cluster",
+        "state": { "on": "On", "degraded": "Degraded", "off": "Off" }
+      },
+      "datastore_capacity": { "name": "Capacity" },
+      "datastore_free": { "name": "Free space" },
+      "datastore_used_percent": { "name": "Used space" },
+      "host_cpu_percent": { "name": "CPU usage" },
+      "host_cpu_used": { "name": "CPU used" },
+      "host_memory_percent": { "name": "Memory usage" },
+      "host_memory_used": { "name": "Memory used" },
+      "host_power": {
+        "name": "Power",
+        "state": { "on": "On", "off": "Off", "suspended": "Suspended", "unknown": "Unknown" }
+      },
+      "host_uptime": { "name": "Uptime" },
+      "hosts_online": { "name": "Hosts online" },
+      "operation": {
+        "name": "Operation",
+        "state": {
+          "idle": "Idle",
+          "running": "Running",
+          "completed": "Completed",
+          "failed": "Failed",
+          "cancelled": "Cancelled"
+        }
+      },
+      "operation_step": {
+        "name": "Operation step",
+        "state": {
+          "idle": "Idle",
+          "preflight": "Checking",
+          "stop_vms": "Stopping VMs",
+          "retreat_on": "Disabling cluster services",
+          "stop_vcenter": "Stopping vCenter",
+          "stop_hosts": "Stopping hosts",
+          "wake_hosts": "Waking hosts",
+          "wait_hosts": "Waiting for hosts",
+          "start_vcenter": "Starting vCenter",
+          "wait_vcenter": "Waiting for vCenter",
+          "retreat_off": "Enabling cluster services",
+          "start_vms": "Starting VMs",
+          "stop_empty_hosts": "Stopping empty hosts"
+        }
+      },
+      "scenario_state": {
+        "name": "State",
+        "state": {
+          "inactive": "Inactive",
+          "starting": "Starting",
+          "stopping": "Stopping",
+          "active": "Active",
+          "partial": "Partially running",
+          "failed": "Failed"
+        }
+      },
+      "vm_cpu_used": { "name": "CPU used" },
+      "vm_host": { "name": "Host" },
+      "vm_ip": { "name": "IP address" },
+      "vm_memory_used": { "name": "Memory used" },
+      "vm_storage": { "name": "Storage used" },
+      "vms_running": { "name": "VMs running" },
+      "vms_total": { "name": "VMs total" }
+    },
+    "switch": {
+      "shutdown_armed": { "name": "Arm cluster shutdown" },
+      "vm_power": { "name": "Power" }
+    }
+  },
+  "exceptions": {
+    "mqtt_not_ready": { "message": "The MQTT integration is not connected." },
+    "agent_offline": { "message": "The agent is offline." },
+    "no_response": { "message": "The agent did not answer. Check its connection and that its clock is correct." },
+    "not_armed": { "message": "Turn on the Arm cluster shutdown switch first." },
+    "confirm_required": { "message": "Set confirm to true to shut the cluster down." },
+    "agent_ambiguous": { "message": "Select the agent with config_entry_id." },
+    "scenario_not_found": { "message": "Scenario {name} does not exist." },
+    "agent_busy": { "message": "Another operation is running." },
+    "agent_invalid_request": { "message": "The agent rejected the request as invalid." },
+    "agent_unknown_command": { "message": "The agent does not know this command, update it." },
+    "agent_no_operation": { "message": "No operation is running." },
+    "agent_interrupted": { "message": "The agent restarted during the operation." },
+    "agent_internal_error": { "message": "The agent hit an internal error, see its log." },
+    "agent_vcenter_unavailable": { "message": "vCenter is not available." },
+    "agent_vcenter_vm_not_found": { "message": "The vCenter VM was not found on any host." },
+    "agent_vcenter_stop_timeout": { "message": "vCenter did not shut down in time." },
+    "agent_vcenter_start_timeout": { "message": "vCenter did not start in time." },
+    "agent_esxi_unavailable": { "message": "An ESXi host is not available." },
+    "agent_host_not_configured": { "message": "A host is missing from the agent configuration." },
+    "agent_host_stop_timeout": { "message": "A host did not shut down in time." },
+    "agent_host_start_timeout": { "message": "A host did not start in time." },
+    "agent_no_wake_method": { "message": "A host could not be started again, so the shutdown was refused." },
+    "agent_wake_failed": { "message": "A host could not be powered on." },
+    "agent_protected_vm_running": { "message": "A protected VM is running." },
+    "agent_vm_protected": { "message": "This VM is protected." },
+    "agent_vm_not_found": { "message": "The VM was not found." },
+    "agent_vm_unreachable": { "message": "The VM is not reachable, its host may be off. Use a scenario to start it." },
+    "agent_vm_stop_timeout": { "message": "A VM did not stop in time." },
+    "agent_vm_start_timeout": { "message": "A VM did not start in time." },
+    "agent_tools_unavailable": { "message": "VMware Tools are not running in this VM. Use Force power off." },
+    "agent_vsphere_error": { "message": "vSphere returned an error, see the agent log." }
+  },
+  "services": {
+    "start_scenario": {
+      "name": "Start scenario",
+      "description": "Starts the hosts a scenario needs and its VMs in order.",
+      "fields": {
+        "scenario": { "name": "Scenario", "description": "Name of the scenario." },
+        "config_entry_id": { "name": "Agent", "description": "Required with more than one agent." }
+      }
+    },
+    "stop_scenario": {
+      "name": "Stop scenario",
+      "description": "Stops the VMs of a scenario in reverse order, keeping VMs used by other active scenarios.",
+      "fields": {
+        "scenario": { "name": "Scenario", "description": "Name of the scenario." },
+        "config_entry_id": { "name": "Agent", "description": "Required with more than one agent." }
+      }
+    },
+    "start_cluster": {
+      "name": "Start cluster",
+      "description": "Powers on all hosts and vCenter.",
+      "fields": {
+        "config_entry_id": { "name": "Agent", "description": "Required with more than one agent." }
+      }
+    },
+    "shutdown_cluster": {
+      "name": "Shut down cluster",
+      "description": "Stops all VMs, vCenter and the hosts.",
+      "fields": {
+        "confirm": { "name": "Confirm", "description": "Must be on for the shutdown to run." },
+        "dry_run": { "name": "Check only", "description": "Only build the plan, change nothing." },
+        "config_entry_id": { "name": "Agent", "description": "Required with more than one agent." }
+      }
+    }
+  }
+}

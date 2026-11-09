@@ -1,0 +1,36 @@
+{
+  "entity": {
+    "button": {
+      "cancel_operation": { "default": "mdi:cancel" },
+      "cluster_shutdown": { "default": "mdi:power" },
+      "cluster_start": { "default": "mdi:server-plus" },
+      "refresh": { "default": "mdi:refresh" },
+      "scenario_start": { "default": "mdi:play" },
+      "scenario_stop": { "default": "mdi:stop" },
+      "shutdown_preview": { "default": "mdi:clipboard-list-outline" },
+      "vm_force_off": { "default": "mdi:power-plug-off" }
+    },
+    "sensor": {
+      "cluster_state": { "default": "mdi:server-network" },
+      "hosts_online": { "default": "mdi:server" },
+      "operation": { "default": "mdi:progress-wrench" },
+      "operation_step": { "default": "mdi:format-list-numbered" },
+      "scenario_state": { "default": "mdi:playlist-play" },
+      "vms_running": { "default": "mdi:desktop-classic" },
+      "vms_total": { "default": "mdi:desktop-classic" }
+    },
+    "switch": {
+      "shutdown_armed": {
+        "default": "mdi:shield-lock",
+        "state": { "on": "mdi:shield-alert" }
+      },
+      "vm_power": { "default": "mdi:desktop-classic" }
+    }
+  },
+  "services": {
+    "shutdown_cluster": { "service": "mdi:power" },
+    "start_cluster": { "service": "mdi:server-plus" },
+    "start_scenario": { "service": "mdi:play" },
+    "stop_scenario": { "service": "mdi:stop" }
+  }
+}

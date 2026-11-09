@@ -1,0 +1,55 @@
+# Copy to config.yaml. ${NAME} reads a secret from the environment.
+
+agent_id: lab
+# Create with: ha-vmware-agent genkey. Enter the same value in Home Assistant.
+shared_key: ${HA_VMWARE_SHARED_KEY}
+
+mqtt:
+  host: ha.example.com
+  # MQTT over WebSocket through the reverse proxy in front of Home Assistant.
+  transport: websockets
+  port: 443
+  path: /mqtt
+  tls: true
+  username: ha-vmware-agent
+  password: ${MQTT_PASSWORD}
+
+vcenter:
+  host: vcenter.lab.local
+  username: svc-ha@vsphere.local
+  password: ${VCENTER_PASSWORD}
+  # Name of the vCenter VM when it runs on one of the hosts below.
+  vm_name: VMware vCenter Server
+
+hosts:
+  # name must be exactly what vCenter shows for this host.
+  - name: esxi01.lab.local
+    address: esxi01.lab.local
+    username: svc-ha
+    password: ${ESXI_PASSWORD}
+    bmc:
+      address: 10.0.0.21
+      username: ADMIN
+      password: ${BMC_PASSWORD}
+      type: auto # Redfish first, then IPMI
+    # Last resort when the BMC does not respond.
+    wol:
+      mac: "00:25:90:00:00:01"
+      broadcast: 10.0.0.255
+
+# Cluster shutdown is refused while any of these VMs is running.
+protected_vms: []
+
+# Cut the power of a VM that ignored the guest shutdown.
+force_after_timeout: true
+poll_interval: 30
+state_file: /data/state.json
+log_level: INFO
+
+timeouts: # seconds
+  guest_stop: 300
+  vcenter_stop: 900
+  host_stop: 300
+  host_start: 900
+  vcenter_start: 1800
+  host_sync: 300

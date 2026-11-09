@@ -1,0 +1,234 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Połączenie z agentem",
+        "description": "Najpierw uruchom agenta. Integracja MQTT musi korzystać z tego samego brokera co agent.",
+        "data": { "agent_id": "ID agenta", "shared_key": "Klucz współdzielony" },
+        "data_description": {
+          "agent_id": "Wartość agent_id z konfiguracji agenta.",
+          "shared_key": "Wartość shared_key z konfiguracji agenta."
+        }
+      },
+      "reconfigure": {
+        "title": "Wymiana klucza współdzielonego",
+        "data": { "shared_key": "Klucz współdzielony" }
+      }
+    },
+    "error": {
+      "mqtt_not_ready": "Integracja MQTT nie jest połączona.",
+      "agent_not_found": "Agent o tym ID nie odpowiedział. Sprawdź, czy działa i korzysta z tego samego brokera.",
+      "invalid_key": "Agent podpisuje wiadomości innym kluczem.",
+      "invalid_key_format": "Klucz jest za krótki, utwórz go poleceniem genkey.",
+      "invalid_agent_id": "Użyj małych liter, cyfr oraz znaków - i _.",
+      "protocol": "Agent używa innej wersji protokołu, zaktualizuj go."
+    },
+    "abort": {
+      "already_configured": "Ten agent jest już skonfigurowany.",
+      "reconfigure_successful": "Klucz został wymieniony."
+    }
+  },
+  "config_subentries": {
+    "scenario": {
+      "entry_type": "Scenariusz",
+      "initiate_flow": { "user": "Dodaj scenariusz" },
+      "step": {
+        "user": {
+          "title": "Nowy scenariusz",
+          "data": {
+            "name": "Nazwa",
+            "power_off_empty_hosts": "Wyłącz puste hosty przy zatrzymywaniu"
+          }
+        },
+        "reconfigure": {
+          "title": "Edycja scenariusza",
+          "data": {
+            "name": "Nazwa",
+            "power_off_empty_hosts": "Wyłącz puste hosty przy zatrzymywaniu"
+          }
+        },
+        "group": {
+          "title": "Grupa {number}",
+          "description": "Maszyny w grupie startują razem. Następna grupa czeka, aż ta będzie gotowa.",
+          "data": {
+            "vms": "Maszyny wirtualne",
+            "wait": "Gotowa, gdy",
+            "delay": "Dodatkowe opóźnienie po grupie",
+            "timeout": "Limit czasu",
+            "add_another": "Dodaj kolejną grupę"
+          }
+        }
+      },
+      "error": { "no_vms_selected": "Wybierz co najmniej jedną maszynę." },
+      "abort": {
+        "no_vms_known": "Agent nie zgłosił jeszcze żadnych maszyn.",
+        "reconfigure_successful": "Scenariusz został zapisany."
+      }
+    }
+  },
+  "selector": {
+    "wait_mode": {
+      "options": {
+        "none": "Nie czekaj",
+        "power": "Maszyna jest włączona",
+        "tools": "VMware Tools odpowiada"
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "agent_online": { "name": "Agent" },
+      "host_connected": { "name": "Połączenie" },
+      "vcenter_reachable": { "name": "vCenter" },
+      "vm_tools": { "name": "VMware Tools" }
+    },
+    "button": {
+      "cancel_operation": { "name": "Anuluj operację" },
+      "cluster_shutdown": { "name": "Wyłącz klaster" },
+      "cluster_start": { "name": "Uruchom klaster" },
+      "refresh": { "name": "Odśwież" },
+      "scenario_start": { "name": "Uruchom" },
+      "scenario_stop": { "name": "Zatrzymaj" },
+      "shutdown_preview": { "name": "Podgląd wyłączenia" },
+      "vm_force_off": { "name": "Wymuś wyłączenie" }
+    },
+    "sensor": {
+      "cluster_cpu_percent": { "name": "Użycie CPU" },
+      "cluster_memory_percent": { "name": "Użycie pamięci" },
+      "cluster_state": {
+        "name": "Klaster",
+        "state": { "on": "Włączony", "degraded": "Częściowo działa", "off": "Wyłączony" }
+      },
+      "datastore_capacity": { "name": "Pojemność" },
+      "datastore_free": { "name": "Wolne miejsce" },
+      "datastore_used_percent": { "name": "Zajęte miejsce" },
+      "host_cpu_percent": { "name": "Użycie CPU" },
+      "host_cpu_used": { "name": "Zużyte CPU" },
+      "host_memory_percent": { "name": "Użycie pamięci" },
+      "host_memory_used": { "name": "Zużyta pamięć" },
+      "host_power": {
+        "name": "Zasilanie",
+        "state": { "on": "Włączony", "off": "Wyłączony", "suspended": "Uśpiony", "unknown": "Nieznane" }
+      },
+      "host_uptime": { "name": "Czas działania" },
+      "hosts_online": { "name": "Hosty online" },
+      "operation": {
+        "name": "Operacja",
+        "state": {
+          "idle": "Bezczynny",
+          "running": "W toku",
+          "completed": "Zakończona",
+          "failed": "Błąd",
+          "cancelled": "Anulowana"
+        }
+      },
+      "operation_step": {
+        "name": "Krok operacji",
+        "state": {
+          "idle": "Bezczynny",
+          "preflight": "Sprawdzanie",
+          "stop_vms": "Wyłączanie maszyn",
+          "retreat_on": "Wyłączanie usług klastra",
+          "stop_vcenter": "Wyłączanie vCenter",
+          "stop_hosts": "Wyłączanie hostów",
+          "wake_hosts": "Włączanie hostów",
+          "wait_hosts": "Oczekiwanie na hosty",
+          "start_vcenter": "Uruchamianie vCenter",
+          "wait_vcenter": "Oczekiwanie na vCenter",
+          "retreat_off": "Włączanie usług klastra",
+          "start_vms": "Uruchamianie maszyn",
+          "stop_empty_hosts": "Wyłączanie pustych hostów"
+        }
+      },
+      "scenario_state": {
+        "name": "Stan",
+        "state": {
+          "inactive": "Nieaktywny",
+          "starting": "Uruchamianie",
+          "stopping": "Zatrzymywanie",
+          "active": "Aktywny",
+          "partial": "Działa częściowo",
+          "failed": "Błąd"
+        }
+      },
+      "vm_cpu_used": { "name": "Zużyte CPU" },
+      "vm_host": { "name": "Host" },
+      "vm_ip": { "name": "Adres IP" },
+      "vm_memory_used": { "name": "Zużyta pamięć" },
+      "vm_storage": { "name": "Zajęty dysk" },
+      "vms_running": { "name": "Działające maszyny" },
+      "vms_total": { "name": "Wszystkie maszyny" }
+    },
+    "switch": {
+      "shutdown_armed": { "name": "Odbezpiecz wyłączenie klastra" },
+      "vm_power": { "name": "Zasilanie" }
+    }
+  },
+  "exceptions": {
+    "mqtt_not_ready": { "message": "Integracja MQTT nie jest połączona." },
+    "agent_offline": { "message": "Agent jest offline." },
+    "no_response": { "message": "Agent nie odpowiedział. Sprawdź jego połączenie i poprawność zegara." },
+    "not_armed": { "message": "Najpierw włącz przełącznik Odbezpiecz wyłączenie klastra." },
+    "confirm_required": { "message": "Ustaw confirm na true, aby wyłączyć klaster." },
+    "agent_ambiguous": { "message": "Wskaż agenta polem config_entry_id." },
+    "scenario_not_found": { "message": "Scenariusz {name} nie istnieje." },
+    "agent_busy": { "message": "Trwa inna operacja." },
+    "agent_invalid_request": { "message": "Agent odrzucił żądanie jako nieprawidłowe." },
+    "agent_unknown_command": { "message": "Agent nie zna tego polecenia, zaktualizuj go." },
+    "agent_no_operation": { "message": "Żadna operacja nie jest w toku." },
+    "agent_interrupted": { "message": "Agent uruchomił się ponownie w trakcie operacji." },
+    "agent_internal_error": { "message": "Błąd wewnętrzny agenta, sprawdź jego log." },
+    "agent_vcenter_unavailable": { "message": "vCenter jest niedostępny." },
+    "agent_vcenter_vm_not_found": { "message": "Nie znaleziono maszyny vCenter na żadnym hoście." },
+    "agent_vcenter_stop_timeout": { "message": "vCenter nie wyłączył się na czas." },
+    "agent_vcenter_start_timeout": { "message": "vCenter nie uruchomił się na czas." },
+    "agent_esxi_unavailable": { "message": "Host ESXi jest niedostępny." },
+    "agent_host_not_configured": { "message": "Brak hosta w konfiguracji agenta." },
+    "agent_host_stop_timeout": { "message": "Host nie wyłączył się na czas." },
+    "agent_host_start_timeout": { "message": "Host nie uruchomił się na czas." },
+    "agent_no_wake_method": { "message": "Hosta nie dałoby się ponownie uruchomić, więc wyłączenie zostało odrzucone." },
+    "agent_wake_failed": { "message": "Nie udało się włączyć hosta." },
+    "agent_protected_vm_running": { "message": "Działa maszyna chroniona." },
+    "agent_vm_protected": { "message": "Ta maszyna jest chroniona." },
+    "agent_vm_not_found": { "message": "Nie znaleziono maszyny." },
+    "agent_vm_unreachable": { "message": "Maszyna jest niedostępna, jej host może być wyłączony. Uruchom ją scenariuszem." },
+    "agent_vm_stop_timeout": { "message": "Maszyna nie wyłączyła się na czas." },
+    "agent_vm_start_timeout": { "message": "Maszyna nie uruchomiła się na czas." },
+    "agent_tools_unavailable": { "message": "W tej maszynie nie działa VMware Tools. Użyj Wymuś wyłączenie." },
+    "agent_vsphere_error": { "message": "vSphere zwrócił błąd, sprawdź log agenta." }
+  },
+  "services": {
+    "start_scenario": {
+      "name": "Uruchom scenariusz",
+      "description": "Włącza hosty potrzebne scenariuszowi i kolejno jego maszyny.",
+      "fields": {
+        "scenario": { "name": "Scenariusz", "description": "Nazwa scenariusza." },
+        "config_entry_id": { "name": "Agent", "description": "Wymagane przy więcej niż jednym agencie." }
+      }
+    },
+    "stop_scenario": {
+      "name": "Zatrzymaj scenariusz",
+      "description": "Wyłącza maszyny scenariusza w odwrotnej kolejności, pomijając używane przez inne aktywne scenariusze.",
+      "fields": {
+        "scenario": { "name": "Scenariusz", "description": "Nazwa scenariusza." },
+        "config_entry_id": { "name": "Agent", "description": "Wymagane przy więcej niż jednym agencie." }
+      }
+    },
+    "start_cluster": {
+      "name": "Uruchom klaster",
+      "description": "Włącza wszystkie hosty i vCenter.",
+      "fields": {
+        "config_entry_id": { "name": "Agent", "description": "Wymagane przy więcej niż jednym agencie." }
+      }
+    },
+    "shutdown_cluster": {
+      "name": "Wyłącz klaster",
+      "description": "Wyłącza wszystkie maszyny, vCenter i hosty.",
+      "fields": {
+        "confirm": { "name": "Potwierdzenie", "description": "Musi być włączone, aby wyłączenie się wykonało." },
+        "dry_run": { "name": "Tylko sprawdzenie", "description": "Buduje plan, niczego nie zmienia." },
+        "config_entry_id": { "name": "Agent", "description": "Wymagane przy więcej niż jednym agencie." }
+      }
+    }
+  }
+}

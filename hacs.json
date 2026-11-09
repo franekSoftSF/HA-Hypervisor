@@ -1,0 +1,5 @@
+{
+  "name": "HA VMware",
+  "homeassistant": "2026.11.0",
+  "hide_default_branch": false
+}

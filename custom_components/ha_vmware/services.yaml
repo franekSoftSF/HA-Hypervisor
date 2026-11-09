@@ -1,0 +1,45 @@
+start_scenario:
+  fields:
+    scenario:
+      required: true
+      example: "Test VDI"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: ha_vmware
+
+stop_scenario:
+  fields:
+    scenario:
+      required: true
+      example: "Test VDI"
+      selector:
+        text:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: ha_vmware
+
+start_cluster:
+  fields:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: ha_vmware
+
+shutdown_cluster:
+  fields:
+    confirm:
+      default: false
+      selector:
+        boolean:
+    dry_run:
+      default: false
+      selector:
+        boolean:
+    config_entry_id:
+      selector:
+        config_entry:
+          integration: ha_vmware
