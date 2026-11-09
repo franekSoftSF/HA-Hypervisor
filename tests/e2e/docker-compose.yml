@@ -1,6 +1,6 @@
 # Full path on a real Home Assistant: broker, simulated vCenter, agent, driver.
 # Test-only values, nothing here is used outside this stack.
-name: ha-vmware-e2e
+name: ha-hypervisor-e2e
 
 services:
   mosquitto:
@@ -33,7 +33,7 @@ services:
       - ./agent-config.yaml:/config/config.yaml:ro
 
   driver:
-    image: ha-vmware-test-agent
+    image: ha-hypervisor-test-agent
     profiles: [driver]
     depends_on:
       homeassistant:

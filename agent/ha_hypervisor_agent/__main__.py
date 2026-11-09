@@ -15,7 +15,7 @@ from .service import AgentService, check
 
 def main() -> int:
     """Run the selected command."""
-    parser = argparse.ArgumentParser(prog="ha-vmware-agent")
+    parser = argparse.ArgumentParser(prog="ha-hypervisor-agent")
     parser.add_argument("--version", action="version", version=__version__)
     commands = parser.add_subparsers(dest="command", required=True)
     for name, text in (

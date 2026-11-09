@@ -19,7 +19,7 @@ from driver import AGENT, BASE, CLIENT, KEY, api, flow, state, step, wait
 ROOT = Path("/src")
 IMAGES = ROOT / "docs" / "images"
 VM_NAMES = ["dc01", "sql01", "web01"]
-DASHBOARD = "ha-vmware"
+DASHBOARD = "ha-hypervisor"
 DASHBOARD_PL = {
     "Cluster": "Klaster",
     "Control": "Sterowanie",
@@ -100,10 +100,10 @@ def build_lab() -> str:
     step("integrations")
     other = {"set_client_cert": False, "set_ca_cert": "off"}
     flow("/api/config/config_entries/flow", "mqtt", {"broker": "mosquitto", "port": 1883, "other_settings": other})
-    result = flow("/api/config/config_entries/flow", "ha_vmware", {"agent_id": AGENT, "shared_key": KEY})
+    result = flow("/api/config/config_entries/flow", "ha_hypervisor", {"agent_id": AGENT, "shared_key": KEY})
     assert result["type"] == "create_entry", result
     entry_id = result["result"]["entry_id"]
-    wait("cluster data", lambda: state("sensor.vmware_e2e_cluster") == "on")
+    wait("cluster data", lambda: state("sensor.hypervisor_e2e_cluster") == "on")
 
     step("scenarios")
     start = api("POST", "/api/config/config_entries/subentries/flow", json={"handler": [entry_id, "scenario"]})
@@ -121,10 +121,10 @@ def build_lab() -> str:
     add_scenario(entry_id, "Only AD", [["dc01"]], ids)
     wait("second scenario", lambda: state("sensor.only_ad_state") == "inactive", 30)
 
-    driver.call("ha_vmware", "start_scenario", scenario="VDI test")
+    driver.call("ha_hypervisor", "start_scenario", scenario="VDI test")
     wait("scenario active", lambda: state("sensor.vdi_test_state") == "active", 60)
-    driver.call("button", "press", entity_id="button.vmware_e2e_preview_shutdown")
-    wait("preview", lambda: state("sensor.vmware_e2e_operation") == "completed", 30)
+    driver.call("button", "press", entity_id="button.hypervisor_e2e_preview_shutdown")
+    wait("preview", lambda: state("sensor.hypervisor_e2e_operation") == "completed", 30)
     return entry_id
 
 
@@ -163,12 +163,12 @@ def set_language(page: Page, language: str, entry_id: str) -> None:
     )
     hass_ws(page, {"type": "config/core/update", "language": language, "country": "PL"})
     api("POST", f"/api/config/config_entries/entry/{entry_id}/reload")
-    wait("entities after language change", lambda: state("sensor.vmware_e2e_cluster") == "on", 30)
+    wait("entities after language change", lambda: state("sensor.hypervisor_e2e_cluster") == "on", 30)
 
 
 def save_dashboard(page: Page, language: str) -> None:
     text = (ROOT / "docs" / "dashboard.example.yaml").read_text(encoding="utf-8")
-    text = text.replace("vmware_lab_", "vmware_e2e_")
+    text = text.replace("hypervisor_lab_", "hypervisor_e2e_")
     if language == "pl":
         for english, polish in DASHBOARD_PL.items():
             text = text.replace(f"heading: {english}", f"heading: {polish}")
@@ -185,17 +185,17 @@ def capture(page: Page, language: str, entry_id: str) -> None:
     save_dashboard(page, language)
 
     page.set_viewport_size({"width": 1500, "height": 820})
-    page.goto(f"{BASE}/{DASHBOARD}/vmware")
+    page.goto(f"{BASE}/{DASHBOARD}/hypervisor")
     settle(page, 6)
     shot(page, language, "dashboard")
 
     page.set_viewport_size({"width": 1400, "height": 1320})
-    page.goto(f"{BASE}/config/integrations/integration/ha_vmware")
+    page.goto(f"{BASE}/config/integrations/integration/ha_hypervisor")
     settle(page)
     shot(page, language, "integration")
 
     page.set_viewport_size({"width": 1400, "height": 1020})
-    page.goto(f"{BASE}/config/devices/device/{device_id(page, 'VMware e2e')}")
+    page.goto(f"{BASE}/config/devices/device/{device_id(page, 'Hypervisor e2e')}")
     settle(page)
     shot(page, language, "cluster-device")
 
@@ -204,7 +204,7 @@ def capture(page: Page, language: str, entry_id: str) -> None:
     settle(page)
     shot(page, language, "vm-device")
 
-    page.goto(f"{BASE}/config/integrations/integration/ha_vmware")
+    page.goto(f"{BASE}/config/integrations/integration/ha_hypervisor")
     settle(page)
     page.get_by_text(labels["add"], exact=True).first.click()
     settle(page, 2)
@@ -238,7 +238,7 @@ def main() -> None:
             {
                 "type": "lovelace/dashboards/create",
                 "url_path": DASHBOARD,
-                "title": "VMware",
+                "title": "Hypervisor",
                 "icon": "mdi:server",
                 "show_in_sidebar": True,
                 "require_admin": False,

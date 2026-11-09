@@ -1,8 +1,8 @@
 # Copy to config.yaml. ${NAME} reads a secret from the environment.
 
 agent_id: lab
-# Create with: ha-vmware-agent genkey. Enter the same value in Home Assistant.
-shared_key: ${HA_VMWARE_SHARED_KEY}
+# Create with: ha-hypervisor-agent genkey. Enter the same value in Home Assistant.
+shared_key: ${HA_HYPERVISOR_SHARED_KEY}
 
 mqtt:
   host: ha.example.com
@@ -11,7 +11,7 @@ mqtt:
   port: 443
   path: /mqtt
   tls: true
-  username: ha-vmware-agent
+  username: ha-hypervisor-agent
   password: ${MQTT_PASSWORD}
 
 vcenter:

@@ -12,8 +12,8 @@ from pytest_homeassistant_custom_component.common import (
     async_fire_mqtt_message,
 )
 
-from custom_components.ha_vmware.const import DOMAIN
-from custom_components.ha_vmware.protocol import seal, topic, unseal
+from custom_components.ha_hypervisor.const import DOMAIN
+from custom_components.ha_hypervisor.protocol import seal, topic, unseal
 
 AGENT = "lab"
 KEY = "k" * 40
@@ -142,7 +142,7 @@ async def agent(hass, mqtt_mock) -> FakeAgent:
 def make_entry(subentries=None) -> MockConfigEntry:
     return MockConfigEntry(
         domain=DOMAIN,
-        title="VMware lab",
+        title="Hypervisor lab",
         unique_id=AGENT,
         data={"agent_id": AGENT, "shared_key": KEY},
         subentries_data=subentries or (),

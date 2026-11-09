@@ -1,12 +1,12 @@
-# HA-Vmware - project instructions
+# HA-Hypervisor - project instructions
 
-Home Assistant integration (HACS) plus an agent outside the cluster that controls a vCenter lab. All HA to agent
+Home Assistant integration (HACS) plus an agent outside the cluster that controls a hypervisor lab (VMware vSphere today). All HA to agent
 communication is MQTT. Current state: `status.md`. Talk to the user in Polish; code, logs and docs in English, with
 Polish translations next to English ones.
 
 ## Layout
-- `custom_components/ha_vmware/` - integration. `link.py` is the MQTT side, scenarios are config subentries.
-- `agent/ha_vmware_agent/` - agent: `vim.py` (vSphere), `power.py` (Redfish, IPMI, WOL), `inventory.py` (state),
+- `custom_components/ha_hypervisor/` - integration. `link.py` is the MQTT side, scenarios are config subentries.
+- `agent/ha_hypervisor_agent/` - agent: `vim.py` (vSphere), `power.py` (Redfish, IPMI, WOL), `inventory.py` (state),
   `operations.py` (sequences), `service.py` (MQTT), `store.py` (what survives the cluster being off).
 - `tests/agent`, `tests/integration`, `tests/e2e`.
 

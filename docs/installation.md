@@ -36,7 +36,7 @@ In the Mosquitto app configuration, add a login for the agent:
 
 ```yaml
 logins:
-  - username: ha-vmware-agent
+  - username: ha-hypervisor-agent
     password: use-a-long-random-password
 ```
 
@@ -63,8 +63,8 @@ topic readwrite #
 user homeassistant
 topic readwrite #
 
-user ha-vmware-agent
-topic readwrite ha_vmware/lab/#
+user ha-hypervisor-agent
+topic readwrite ha_hypervisor/lab/#
 ```
 
 Restart the Mosquitto app.
@@ -136,17 +136,17 @@ agent must be in the same network segment, and it cannot be verified in advance.
 ## 5. Agent
 
 ```bash
-git clone https://github.com/franekSoftSF/HA-Vmware.git
-cd HA-Vmware/agent
+git clone https://github.com/franekSoftSF/HA-Hypervisor.git
+cd HA-Hypervisor/agent
 cp config.example.yaml config.yaml
 cp .env.example .env
 chmod 600 .env config.yaml
 ```
 
-Create the shared key and put it in `.env` as `HA_VMWARE_SHARED_KEY`, together with the passwords:
+Create the shared key and put it in `.env` as `HA_HYPERVISOR_SHARED_KEY`, together with the passwords:
 
 ```bash
-docker compose -f docker-compose.example.yml run --rm ha-vmware-agent genkey
+docker compose -f docker-compose.example.yml run --rm ha-hypervisor-agent genkey
 ```
 
 Edit `config.yaml`:
@@ -164,7 +164,7 @@ Edit `config.yaml`:
 Test all connections. This changes nothing:
 
 ```bash
-docker compose -f docker-compose.example.yml run --rm ha-vmware-agent check --config /config/config.yaml
+docker compose -f docker-compose.example.yml run --rm ha-hypervisor-agent check --config /config/config.yaml
 ```
 
 Every line should start with `OK`. `WARN` means the BMC did not answer and only an unverifiable Wake on LAN is left.
@@ -183,10 +183,10 @@ The log should say `Connected to the broker`.
 ## 6. Home Assistant
 
 1. Set up the **MQTT** integration with the same broker, if it is not there yet.
-2. In HACS open the three-dot menu, **Custom repositories**, enter `https://github.com/franekSoftSF/HA-Vmware`, type
+2. In HACS open the three-dot menu, **Custom repositories**, enter `https://github.com/franekSoftSF/HA-Hypervisor`, type
    **Integration**.
-3. Find **HA VMware** in HACS, download it and restart Home Assistant.
-4. **Settings, Devices & services, Add integration, HA VMware.** Enter `agent_id` and the shared key.
+3. Find **HA Hypervisor** in HACS, download it and restart Home Assistant.
+4. **Settings, Devices & services, Add integration, HA Hypervisor.** Enter `agent_id` and the shared key.
 
 Hosts, VMs and datastores appear as devices within one polling interval.
 

@@ -7,12 +7,12 @@ from typing import Any
 from homeassistant.components.diagnostics import async_redact_data
 from homeassistant.core import HomeAssistant
 
-from . import HaVmwareConfigEntry
+from . import HaHypervisorConfigEntry
 from .const import CONF_SHARED_KEY
 
 
 async def async_get_config_entry_diagnostics(
-    _hass: HomeAssistant, entry: HaVmwareConfigEntry
+    _hass: HomeAssistant, entry: HaHypervisorConfigEntry
 ) -> dict[str, Any]:
     """Return what the integration knows."""
     link = entry.runtime_data

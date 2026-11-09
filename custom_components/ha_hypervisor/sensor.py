@@ -23,7 +23,7 @@ from homeassistant.const import (
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import HaVmwareConfigEntry
+from . import HaHypervisorConfigEntry
 from .entity import (
     SECTION_DATASTORES,
     SECTION_HOSTS,
@@ -191,7 +191,7 @@ CLUSTER_SENSORS = (
 
 async def async_setup_entry(
     _hass: HomeAssistant,
-    entry: HaVmwareConfigEntry,
+    entry: HaHypervisorConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Create the sensors."""

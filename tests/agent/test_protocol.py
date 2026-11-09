@@ -9,11 +9,11 @@ from types import SimpleNamespace
 import pytest
 
 from conftest import KEY, make_config
-from ha_vmware_agent import config as config_module
-from ha_vmware_agent import power as power_module
-from ha_vmware_agent.config import BmcConfig, ConfigError, WolConfig
-from ha_vmware_agent.power import HostPower, PowerError, Redfish, WakeOnLan
-from ha_vmware_agent.protocol import (
+from ha_hypervisor_agent import config as config_module
+from ha_hypervisor_agent import power as power_module
+from ha_hypervisor_agent.config import BmcConfig, ConfigError, WolConfig
+from ha_hypervisor_agent.power import HostPower, PowerError, Redfish, WakeOnLan
+from ha_hypervisor_agent.protocol import (
     COMMAND_TTL,
     ERROR_CODES,
     ProtocolError,
@@ -22,15 +22,15 @@ from ha_vmware_agent.protocol import (
     topic,
     unseal,
 )
-from ha_vmware_agent.service import AgentService, ReplayGuard
+from ha_hypervisor_agent.service import AgentService, ReplayGuard
 
 ROOT = Path(__file__).resolve().parents[2]
 TARGET = topic("lab", "cmd")
 
 
 def test_protocol_copies_are_identical():
-    agent = ROOT / "agent" / "ha_vmware_agent" / "protocol.py"
-    integration = ROOT / "custom_components" / "ha_vmware" / "protocol.py"
+    agent = ROOT / "agent" / "ha_hypervisor_agent" / "protocol.py"
+    integration = ROOT / "custom_components" / "ha_hypervisor" / "protocol.py"
     assert agent.read_bytes() == integration.read_bytes()
 
 
@@ -107,7 +107,7 @@ def test_all_error_codes_are_unique():
 
 def test_example_configuration_is_valid(monkeypatch):
     for name in (
-        "HA_VMWARE_SHARED_KEY",
+        "HA_HYPERVISOR_SHARED_KEY",
         "MQTT_PASSWORD",
         "VCENTER_PASSWORD",
         "ESXI_PASSWORD",

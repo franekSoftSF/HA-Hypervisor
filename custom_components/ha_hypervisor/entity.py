@@ -22,8 +22,8 @@ def agent_device(link: AgentLink) -> DeviceInfo:
     """Return the device representing the agent and its cluster."""
     return DeviceInfo(
         identifiers={(DOMAIN, link.agent_id)},
-        name=f"VMware {link.agent_id}",
-        manufacturer="HA VMware",
+        name=f"Hypervisor {link.agent_id}",
+        manufacturer="HA Hypervisor",
         model="Agent",
     )
 
@@ -78,7 +78,7 @@ def scenario_device(link: AgentLink, subentry: ConfigSubentry) -> DeviceInfo:
     return DeviceInfo(
         identifiers={(DOMAIN, f"{link.agent_id}:scenario:{subentry.subentry_id}")},
         name=subentry.title,
-        manufacturer="HA VMware",
+        manufacturer="HA Hypervisor",
         model="Scenario",
     )
 

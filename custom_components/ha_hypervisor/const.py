@@ -1,6 +1,6 @@
-"""Constants of the HA VMware integration."""
+"""Constants of the HA Hypervisor integration."""
 
-DOMAIN = "ha_vmware"
+DOMAIN = "ha_hypervisor"
 
 CONF_AGENT_ID = "agent_id"
 CONF_SHARED_KEY = "shared_key"

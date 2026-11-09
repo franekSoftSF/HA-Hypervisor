@@ -1,4 +1,4 @@
-"""VMware vCenter control through an agent connected over MQTT."""
+"""Hypervisor lab control through an agent connected over MQTT."""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from .services import async_setup_services
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR, Platform.SWITCH]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
-type HaVmwareConfigEntry = ConfigEntry[AgentLink]
+type HaHypervisorConfigEntry = ConfigEntry[AgentLink]
 
 
 async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
@@ -27,7 +27,7 @@ async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
     return True
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: HaVmwareConfigEntry) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: HaHypervisorConfigEntry) -> None:
     """Connect to the agent."""
     if not await mqtt.async_wait_for_mqtt_client(hass):
         raise ConfigEntryNotReady(
@@ -46,17 +46,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaVmwareConfigEntry) -> 
     link.async_update_agent_device()
 
 
-async def _async_reload(hass: HomeAssistant, entry: HaVmwareConfigEntry) -> None:
+async def _async_reload(hass: HomeAssistant, entry: HaHypervisorConfigEntry) -> None:
     await hass.config_entries.async_reload(entry.entry_id)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: HaVmwareConfigEntry) -> None:
+async def async_unload_entry(hass: HomeAssistant, entry: HaHypervisorConfigEntry) -> None:
     """Disconnect from the agent."""
     await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
 
 
 async def async_remove_config_entry_device(
-    _hass: HomeAssistant, entry: HaVmwareConfigEntry, device: DeviceEntry
+    _hass: HomeAssistant, entry: HaHypervisorConfigEntry, device: DeviceEntry
 ) -> bool:
     """Allow removing a host, VM or datastore the agent no longer reports."""
     link = entry.runtime_data

@@ -102,19 +102,19 @@ def main() -> None:
     )
     assert result["type"] == "create_entry", result
 
-    step("HA VMware config flow: wrong key is refused")
+    step("HA Hypervisor config flow: wrong key is refused")
     result = flow(
         "/api/config/config_entries/flow",
-        "ha_vmware",
+        "ha_hypervisor",
         {"agent_id": AGENT, "shared_key": "x" * 40},
     )
     assert result["errors"] == {"base": "invalid_key"}, result
     api("DELETE", f"/api/config/config_entries/flow/{result['flow_id']}")
 
-    step("HA VMware config flow")
+    step("HA Hypervisor config flow")
     result = flow(
         "/api/config/config_entries/flow",
-        "ha_vmware",
+        "ha_hypervisor",
         {"agent_id": AGENT, "shared_key": KEY},
     )
     assert result["type"] == "create_entry", result
@@ -127,7 +127,7 @@ def main() -> None:
             (
                 e
                 for e, s in states().items()
-                if e == "sensor.vmware_e2e_cluster" and s["state"] in ("on", "degraded")
+                if e == "sensor.hypervisor_e2e_cluster" and s["state"] in ("on", "degraded")
             ),
             None,
         ),
@@ -161,20 +161,20 @@ def main() -> None:
     step("shutdown button is locked until armed")
     response = session.post(
         f"{BASE}/api/services/button/press",
-        json={"entity_id": "button.vmware_e2e_shut_down_cluster"},
+        json={"entity_id": "button.hypervisor_e2e_shut_down_cluster"},
         timeout=30,
     )
     assert response.status_code == 400, response.text
-    assert state("sensor.vmware_e2e_operation") != "running"
+    assert state("sensor.hypervisor_e2e_operation") != "running"
 
     step("shutdown preview")
-    call("button", "press", entity_id="button.vmware_e2e_preview_shutdown")
+    call("button", "press", entity_id="button.hypervisor_e2e_preview_shutdown")
     wait(
         "operation finished",
-        lambda: state("sensor.vmware_e2e_operation") in ("completed", "failed"),
+        lambda: state("sensor.hypervisor_e2e_operation") in ("completed", "failed"),
         30,
     )
-    operation = states()["sensor.vmware_e2e_operation"]
+    operation = states()["sensor.hypervisor_e2e_operation"]
     print(f"   {operation['state']}: {operation['attributes']}")
     assert operation["state"] == "completed", operation
     plan = operation["attributes"]["plan"]
@@ -212,7 +212,7 @@ def main() -> None:
     for switch_id in switches:
         call("button", "press", entity_id=switch_id.replace("switch.", "button.").replace("_power", "_force_power_off"))
     wait("all VMs off", lambda: all(state(s) == "off" for s in switches), 30)
-    call("ha_vmware", "start_scenario", scenario="Test")
+    call("ha_hypervisor", "start_scenario", scenario="Test")
     wait("scenario active", lambda: state("sensor.test_state") == "active", 60)
     assert all(state(s) == "on" for s in switches)
 
@@ -223,12 +223,12 @@ def main() -> None:
 
     step("action without confirm is refused")
     response = session.post(
-        f"{BASE}/api/services/ha_vmware/shutdown_cluster", json={}, timeout=30
+        f"{BASE}/api/services/ha_hypervisor/shutdown_cluster", json={}, timeout=30
     )
     assert response.status_code == 400, response.text
 
     step("real vSphere API calls that the mocks stand in for")
-    from ha_vmware_agent.vim import VimClient, VimError  # noqa: PLC0415
+    from ha_hypervisor_agent.vim import VimClient, VimError  # noqa: PLC0415
 
     esxi = VimClient.connect("esxi", 443, "user", "pass", False)
     data = esxi.collect("configured-name")
@@ -259,7 +259,7 @@ def main() -> None:
     relevant = [
         line
         for line in log.splitlines()
-        if "ha_vmware" in line and ("ERROR" in line or "WARNING" in line)
+        if "ha_hypervisor" in line and ("ERROR" in line or "WARNING" in line)
         and "custom integration" not in line
         and "Ignoring message" not in line
     ]

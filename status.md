@@ -1,6 +1,6 @@
 # Status
 
-Version 0.1.0, built for Home Assistant 2026.11.
+Version 0.2.0 (renamed from HA VMware), built for Home Assistant 2026.11.
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
@@ -15,4 +15,5 @@ Version 0.1.0, built for Home Assistant 2026.11.
 
 ## Next
 1. Deploy the agent and run `check`, then a shutdown preview, then a real cycle.
-2. Possible additions: disk and network statistics through PerformanceManager, BMC sensors (power draw, temperature).
+2. Proxmox VE driver next to VMware, after the test on real hardware passes. Open: one platform per environment or mixed.
+3. Possible additions: disk and network statistics through PerformanceManager, BMC sensors (power draw, temperature).

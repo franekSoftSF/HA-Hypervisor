@@ -7,11 +7,11 @@ from typing import Any
 
 import pytest
 
-from ha_vmware_agent.config import parse
-from ha_vmware_agent.operations import Orchestrator
-from ha_vmware_agent.power import PowerError
-from ha_vmware_agent.store import Store
-from ha_vmware_agent.vim import VimNotFound, VimToolsUnavailable, VimUnavailable
+from ha_hypervisor_agent.config import parse
+from ha_hypervisor_agent.operations import Orchestrator
+from ha_hypervisor_agent.power import PowerError
+from ha_hypervisor_agent.store import Store
+from ha_hypervisor_agent.vim import VimNotFound, VimToolsUnavailable, VimUnavailable
 
 KEY = "k" * 40
 

@@ -97,7 +97,7 @@ class AgentService:
         settings = self._config.mqtt
         client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2,
-            client_id=f"ha_vmware_agent_{self._config.agent_id}",
+            client_id=f"ha_hypervisor_agent_{self._config.agent_id}",
             transport=settings.transport,
             # Never let the broker queue commands for an offline agent.
             clean_session=True,

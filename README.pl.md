@@ -1,11 +1,11 @@
-# HA VMware
+# HA Hypervisor
 
 Sterowanie laboratorium vCenter z Home Assistanta, gdy HA nie ma do niego bezpośredniego dostępu: statystyki,
-zasilanie maszyn, wyłączanie i uruchamianie klastra oraz scenariusze startu. Wersja angielska: [README.md](README.md).
+zasilanie maszyn, wyłączanie i uruchamianie klastra oraz scenariusze startu. Obecnie obsługuje VMware vSphere. Wersja angielska: [README.md](README.md).
 
 **[Instrukcja instalacji](docs/pl/installation.md)**
 
-![Panel](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/pl/dashboard.png)
+![Panel](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/pl/dashboard.png)
 
 *Zrzuty pochodzą z Home Assistant 2026.11 połączonego z `vcsim`, symulatorem vSphere, dlatego większość wartości jest
 niska, a nazwy hostów są wygenerowane.*
@@ -39,7 +39,7 @@ liczników vSphere, przepustowość dysków i sieci nie jest zbierana.
 
 | Klaster | Maszyna wirtualna |
 |---|---|
-| ![Urządzenie klastra](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/pl/cluster-device.png) | ![Urządzenie maszyny](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/pl/vm-device.png) |
+| ![Urządzenie klastra](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/pl/cluster-device.png) | ![Urządzenie maszyny](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/pl/vm-device.png) |
 
 Przykład powyższego panelu jest w [docs/dashboard.example.yaml](docs/dashboard.example.yaml).
 
@@ -49,7 +49,7 @@ W skrócie, według [instrukcji instalacji](docs/pl/installation.md):
 
 1. Mosquitto z osobnym kontem dla agenta.
 2. Agent w Dockerze na urządzeniu poza klastrem, sprawdzony poleceniem `check`.
-3. W HACS dodaj to repozytorium jako własną integrację, zainstaluj **HA VMware**, uruchom ponownie HA i dodaj integrację.
+3. W HACS dodaj to repozytorium jako własną integrację, zainstaluj **HA Hypervisor**, uruchom ponownie HA i dodaj integrację.
 
 ## Wyłączanie klastra
 
@@ -68,13 +68,13 @@ vCenter nigdy nie jest wyłączana siłowo.
 Scenariusz to uporządkowana lista grup: maszyny w grupie startują razem, a następna grupa na nie czeka (VMware Tools,
 stan zasilania lub nic, plus dodatkowe opóźnienie).
 
-![Kreator scenariusza](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/pl/scenario-wizard.png)
+![Kreator scenariusza](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/pl/scenario-wizard.png)
 
 Uruchomienie scenariusza włącza też potrzebne hosty i vCenter, jeśli są wyłączone. Zatrzymanie działa w odwrotnej
 kolejności i nie rusza maszyn używanych przez inny aktywny scenariusz. W automatyzacji:
 
 ```yaml
-action: ha_vmware.start_scenario
+action: ha_hypervisor.start_scenario
 data:
   scenario: Test VDI
 ```

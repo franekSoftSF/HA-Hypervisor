@@ -1,7 +1,7 @@
 # Run on an always-on machine in the vCenter management network, outside the cluster.
 # Secrets go to an .env file next to this one, with permissions 600.
 services:
-  ha-vmware-agent:
+  ha-hypervisor-agent:
     build: .
     restart: unless-stopped
     # Wake on LAN broadcasts need the host network.

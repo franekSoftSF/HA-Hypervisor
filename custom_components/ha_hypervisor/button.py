@@ -10,7 +10,7 @@ from homeassistant.config_entries import ConfigSubentry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from . import HaVmwareConfigEntry
+from . import HaHypervisorConfigEntry
 from .entity import (
     SECTION_VMS,
     ClusterEntity,
@@ -26,7 +26,7 @@ from .protocol import CMD_REFRESH, VM_ACTION_OFF
 
 async def async_setup_entry(
     _hass: HomeAssistant,
-    entry: HaVmwareConfigEntry,
+    entry: HaHypervisorConfigEntry,
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     """Create the buttons."""

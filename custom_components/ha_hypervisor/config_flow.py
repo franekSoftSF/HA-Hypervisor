@@ -88,7 +88,7 @@ async def _async_probe_agent(hass: HomeAssistant, agent_id: str, key: str) -> st
         unsubscribe()
 
 
-class HaVmwareConfigFlow(ConfigFlow, domain=DOMAIN):
+class HaHypervisorConfigFlow(ConfigFlow, domain=DOMAIN):
     """Connect to one agent."""
 
     VERSION = 1
@@ -134,7 +134,7 @@ class HaVmwareConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = error
             else:
                 return self.async_create_entry(
-                    title=f"VMware {agent_id}", data=user_input
+                    title=f"Hypervisor {agent_id}", data=user_input
                 )
         return self.async_show_form(
             step_id="user", data_schema=self._schema(agent_id), errors=errors

@@ -8,7 +8,7 @@ start_scenario:
     config_entry_id:
       selector:
         config_entry:
-          integration: ha_vmware
+          integration: ha_hypervisor
 
 stop_scenario:
   fields:
@@ -20,14 +20,14 @@ stop_scenario:
     config_entry_id:
       selector:
         config_entry:
-          integration: ha_vmware
+          integration: ha_hypervisor
 
 start_cluster:
   fields:
     config_entry_id:
       selector:
         config_entry:
-          integration: ha_vmware
+          integration: ha_hypervisor
 
 shutdown_cluster:
   fields:
@@ -42,4 +42,4 @@ shutdown_cluster:
     config_entry_id:
       selector:
         config_entry:
-          integration: ha_vmware
+          integration: ha_hypervisor

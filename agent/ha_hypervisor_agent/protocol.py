@@ -1,6 +1,6 @@
 """Wire protocol between the Home Assistant integration and the agent.
 
-This file exists twice, in custom_components/ha_vmware and in agent/ha_vmware_agent,
+This file exists twice, in custom_components/ha_hypervisor and in agent/ha_hypervisor_agent,
 because HACS ships only the integration directory. Both copies must stay byte-identical
 (tests/test_protocol.py checks it). It must not import anything outside the standard
 library.
@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from typing import Any
 
 PROTOCOL_VERSION = 1
-TOPIC_ROOT = "ha_vmware"
+TOPIC_ROOT = "ha_hypervisor"
 MIN_KEY_LENGTH = 32
 
 # A command is valid for this long. It covers MQTT delays only, never a queue:

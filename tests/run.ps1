@@ -14,16 +14,16 @@ function Invoke-Step($name, [scriptblock]$action) {
 }
 
 docker pull -q ghcr.io/home-assistant/home-assistant:stable | Out-Null
-docker build -q -f "$docker\agent.Dockerfile" -t ha-vmware-test-agent $docker | Out-Null
-docker build -q -f "$docker\integration.Dockerfile" -t ha-vmware-test-ha $docker | Out-Null
+docker build -q -f "$docker\agent.Dockerfile" -t ha-hypervisor-test-agent $docker | Out-Null
+docker build -q -f "$docker\integration.Dockerfile" -t ha-hypervisor-test-ha $docker | Out-Null
 
 Invoke-Step 'Agent tests' {
     docker run --rm -v "${root}:/src" -w /src -e PYTHONPATH=/src/agent:/src/tests/agent `
-        -e PYTHONDONTWRITEBYTECODE=1 ha-vmware-test-agent pytest tests/agent -q -p no:cacheprovider
+        -e PYTHONDONTWRITEBYTECODE=1 ha-hypervisor-test-agent pytest tests/agent -q -p no:cacheprovider
 }
 Invoke-Step 'Integration tests' {
     docker run --rm -v "${root}:/src" -w /src -e PYTHONPATH=/src:/src/tests/integration `
-        -e PYTHONDONTWRITEBYTECODE=1 ha-vmware-test-ha python3 -c `
+        -e PYTHONDONTWRITEBYTECODE=1 ha-hypervisor-test-ha python3 -c `
         'import homeassistant, pytest, sys; sys.exit(pytest.main(sys.argv[1:]))' `
         tests/integration -q -p no:cacheprovider --asyncio-mode=auto --tb=short --show-capture=no
 }

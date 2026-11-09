@@ -15,12 +15,12 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 import pytest
 
 from conftest import AGENT, KEY, setup_entry, state_doc
-from custom_components.ha_vmware import config_flow
-from custom_components.ha_vmware.const import DOMAIN
-from custom_components.ha_vmware.protocol import ERROR_CODES, seal, topic, STEPS
+from custom_components.ha_hypervisor import config_flow
+from custom_components.ha_hypervisor.const import DOMAIN
+from custom_components.ha_hypervisor.protocol import ERROR_CODES, seal, topic, STEPS
 
 ROOT = Path(__file__).resolve().parents[2]
-COMPONENT = ROOT / "custom_components" / "ha_vmware"
+COMPONENT = ROOT / "custom_components" / "ha_hypervisor"
 SCENARIO_DATA = {
     "power_off_empty_hosts": False,
     "steps": [{"vms": ["vm-1"], "wait": "tools", "delay": 0, "timeout": 600}],
@@ -447,7 +447,7 @@ async def test_unload(hass, agent):
 
 
 async def test_diagnostics_hide_the_key(hass, agent):
-    from custom_components.ha_vmware.diagnostics import async_get_config_entry_diagnostics
+    from custom_components.ha_hypervisor.diagnostics import async_get_config_entry_diagnostics
 
     entry = await setup_entry(hass, agent)
     data = await async_get_config_entry_diagnostics(hass, entry)

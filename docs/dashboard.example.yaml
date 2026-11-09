@@ -1,9 +1,9 @@
 # Example dashboard. Replace "lab" in the entity ids with your agent_id,
 # and the VM and scenario names with your own.
-title: VMware
+title: Hypervisor
 views:
-  - title: VMware
-    path: vmware
+  - title: Hypervisor
+    path: hypervisor
     icon: mdi:server
     type: sections
     max_columns: 4
@@ -13,35 +13,35 @@ views:
           - type: heading
             heading: Cluster
           - type: tile
-            entity: sensor.vmware_lab_cluster
+            entity: sensor.hypervisor_lab_cluster
             name: { type: entity }
           - type: tile
-            entity: binary_sensor.vmware_lab_vcenter
+            entity: binary_sensor.hypervisor_lab_vcenter
             name: { type: entity }
           - type: tile
-            entity: sensor.vmware_lab_cpu_usage
+            entity: sensor.hypervisor_lab_cpu_usage
             name: { type: entity }
           - type: tile
-            entity: sensor.vmware_lab_memory_usage
+            entity: sensor.hypervisor_lab_memory_usage
             name: { type: entity }
           - type: tile
-            entity: sensor.vmware_lab_hosts_online
+            entity: sensor.hypervisor_lab_hosts_online
             name: { type: entity }
           - type: tile
-            entity: sensor.vmware_lab_vms_running
+            entity: sensor.hypervisor_lab_vms_running
             name: { type: entity }
           - type: tile
-            entity: sensor.vmware_lab_operation
+            entity: sensor.hypervisor_lab_operation
             name: { type: entity }
           - type: tile
-            entity: sensor.vmware_lab_operation_step
+            entity: sensor.hypervisor_lab_operation_step
             name: { type: entity }
       - type: grid
         cards:
           - type: heading
             heading: Control
           - type: tile
-            entity: button.vmware_lab_start_cluster
+            entity: button.hypervisor_lab_start_cluster
             name: { type: entity }
             hide_state: true
             tap_action:
@@ -49,7 +49,7 @@ views:
             grid_options:
               columns: full
           - type: tile
-            entity: button.vmware_lab_preview_shutdown
+            entity: button.hypervisor_lab_preview_shutdown
             name: { type: entity }
             hide_state: true
             tap_action:
@@ -57,12 +57,12 @@ views:
             grid_options:
               columns: full
           - type: tile
-            entity: switch.vmware_lab_arm_cluster_shutdown
+            entity: switch.hypervisor_lab_arm_cluster_shutdown
             name: { type: entity }
             grid_options:
               columns: full
           - type: tile
-            entity: button.vmware_lab_shut_down_cluster
+            entity: button.hypervisor_lab_shut_down_cluster
             name: { type: entity }
             hide_state: true
             tap_action:
@@ -71,7 +71,7 @@ views:
             grid_options:
               columns: full
           - type: tile
-            entity: button.vmware_lab_cancel_operation
+            entity: button.hypervisor_lab_cancel_operation
             name: { type: entity }
             hide_state: true
             tap_action:

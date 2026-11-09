@@ -5,15 +5,15 @@ from __future__ import annotations
 import pytest
 
 from conftest import FakeInfra, make_config
-from ha_vmware_agent.inventory import build_state, build_view, remember
-from ha_vmware_agent.operations import Busy, OperationFailed, Orchestrator
-from ha_vmware_agent.protocol import (
+from ha_hypervisor_agent.inventory import build_state, build_view, remember
+from ha_hypervisor_agent.operations import Busy, OperationFailed, Orchestrator
+from ha_hypervisor_agent.protocol import (
     CMD_CLUSTER_SHUTDOWN as SHUTDOWN,
     CMD_CLUSTER_START as START,
     CMD_SCENARIO_START as SCENARIO_START,
     CMD_SCENARIO_STOP as SCENARIO_STOP,
 )
-from ha_vmware_agent.store import Store
+from ha_hypervisor_agent.store import Store
 
 
 def scenario(*groups, sid="s1", name="Test", **kwargs):

@@ -1,11 +1,11 @@
-# HA VMware
+# HA Hypervisor
 
 Home Assistant control of a vCenter lab that Home Assistant cannot reach directly: statistics, VM power,
-cluster shutdown and start, and start scenarios. Polish version: [README.pl.md](README.pl.md).
+cluster shutdown and start, and start scenarios. Currently supports VMware vSphere. Polish version: [README.pl.md](README.pl.md).
 
 **[Installation guide](docs/installation.md)**
 
-![Dashboard](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/en/dashboard.png)
+![Dashboard](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/en/dashboard.png)
 
 *Screenshots come from Home Assistant 2026.11 connected to `vcsim`, a vSphere simulator, so most metrics are low
 and host names are generated.*
@@ -40,7 +40,7 @@ stats: disk and network throughput are not collected.
 
 | Cluster | Virtual machine |
 |---|---|
-| ![Cluster device](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/en/cluster-device.png) | ![VM device](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/en/vm-device.png) |
+| ![Cluster device](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/en/cluster-device.png) | ![VM device](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/en/vm-device.png) |
 
 An example of the dashboard above is in [docs/dashboard.example.yaml](docs/dashboard.example.yaml).
 
@@ -50,7 +50,7 @@ In short, following the [installation guide](docs/installation.md):
 
 1. Mosquitto with a separate account for the agent.
 2. The agent in Docker on a machine outside the cluster, tested with its `check` command.
-3. In HACS add this repository as a custom Integration, install **HA VMware**, restart, and add the integration.
+3. In HACS add this repository as a custom Integration, install **HA Hypervisor**, restart, and add the integration.
 
 ## Shutting the cluster down
 
@@ -68,13 +68,13 @@ is refused if that fails, or if a VM from `protected_vms` is running. The vCente
 A scenario is an ordered list of groups: VMs in a group start together and the next group waits for them (VMware
 Tools, power state or nothing, plus an extra delay).
 
-![Scenario wizard](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/en/scenario-wizard.png)
+![Scenario wizard](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/en/scenario-wizard.png)
 
 Starting a scenario also powers on the hosts it needs, and vCenter, when they are off. Stopping works in reverse
 order and leaves VMs used by another active scenario running. From automations:
 
 ```yaml
-action: ha_vmware.start_scenario
+action: ha_hypervisor.start_scenario
 data:
   scenario: Test VDI
 ```
