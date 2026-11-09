@@ -1,6 +1,6 @@
 # HA-Hypervisor - project instructions
 
-Home Assistant integration (HACS) plus an agent outside the cluster that controls a hypervisor lab (VMware vSphere today). All HA to agent
+Home Assistant integration (installed from the HA Marketplace, which replaced HACS in 2026.11) plus an agent outside the cluster that controls a hypervisor lab (VMware vSphere today). All HA to agent
 communication is MQTT. Current state: `status.md`. Talk to the user in Polish; code, logs and docs in English, with
 Polish translations next to English ones.
 
@@ -12,7 +12,7 @@ Polish translations next to English ones.
 
 ## Rules
 - Always target the newest Home Assistant release. Before a change check the contributors blog for new deprecations
-  and bump `hacs.json`. `tests/docker/integration.Dockerfile` runs on the real current image.
+  and bump `hacs.json` (the Marketplace still reads it). Release tags equal the manifest version. `tests/docker/integration.Dockerfile` runs on the real current image.
 - `protocol.py` exists twice and must stay byte-identical (tested). Edit one, copy to the other.
 - Commands are never retained, always signed, always expiring. Do not add a queued or retained command path.
 - New error code or step: add to `protocol.py` and to both translation files (tested).

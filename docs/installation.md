@@ -16,7 +16,7 @@ Home Assistant + integration  <->  Mosquitto  <--MQTT over TLS--  agent
 
 | What | Details |
 |---|---|
-| Home Assistant | 2026.11 or newer, with HACS and the MQTT integration |
+| Home Assistant | 2026.11 or newer, with the MQTT integration. HACS is not needed, the built-in Marketplace replaced it |
 | Machine for the agent | Always on, **outside the cluster**, in the vCenter management network, with Docker. A Raspberry Pi, a mini PC or a VM on other hardware |
 | Network from the agent | vCenter and every ESXi on 443, every BMC on 443 and 623/udp, the broker |
 | Clock | NTP on the agent and on Home Assistant. A command expires after two minutes |
@@ -183,9 +183,10 @@ The log should say `Connected to the broker`.
 ## 6. Home Assistant
 
 1. Set up the **MQTT** integration with the same broker, if it is not there yet.
-2. In HACS open the three-dot menu, **Custom repositories**, enter `https://github.com/franekSoftSF/HA-Hypervisor`, type
-   **Integration**.
-3. Find **HA Hypervisor** in HACS, download it and restart Home Assistant.
+2. Go to **Settings, Marketplace** and accept the warning. Select **Add from link** and connect your GitHub account when
+   asked: the Marketplace requires it for repositories added by link.
+3. Enter `https://github.com/franekSoftSF/HA-Hypervisor`, choose **Integration** if asked for the type, and select
+   **Add**. Open **HA Hypervisor** and install it. Restart only if a repair asks you to.
 4. **Settings, Devices & services, Add integration, HA Hypervisor.** Enter `agent_id` and the shared key.
 
 Hosts, VMs and datastores appear as devices within one polling interval.
@@ -230,7 +231,7 @@ Go step by step, ideally when you can reach the server physically:
 
 ## Update
 
-Integration: through HACS. Agent:
+Integration: through the Marketplace. Agent:
 
 ```bash
 git pull

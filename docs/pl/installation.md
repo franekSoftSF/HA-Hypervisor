@@ -16,7 +16,7 @@ Home Assistant + integracja  <->  Mosquitto  <--MQTT po TLS--  agent
 
 | Co | Szczegóły |
 |---|---|
-| Home Assistant | 2026.11 lub nowszy, z HACS i integracją MQTT |
+| Home Assistant | 2026.11 lub nowszy, z integracją MQTT. HACS nie jest potrzebny, zastąpił go wbudowany Marketplace |
 | Urządzenie dla agenta | Zawsze włączone, **poza klastrem**, w sieci zarządzania vCenter, z Dockerem. Raspberry Pi, mini PC albo VM na innym sprzęcie |
 | Sieć od agenta | vCenter i każdy ESXi na 443, każdy BMC na 443 i 623/udp, broker |
 | Zegar | NTP na agencie i na Home Assistancie. Polecenie wygasa po dwóch minutach |
@@ -184,9 +184,10 @@ W logu powinien pojawić się wpis `Connected to the broker`.
 ## 6. Home Assistant
 
 1. Skonfiguruj integrację **MQTT** z tym samym brokerem, jeśli jej jeszcze nie ma.
-2. W HACS otwórz menu z trzema kropkami, **Custom repositories**, wpisz `https://github.com/franekSoftSF/HA-Hypervisor`,
-   typ **Integration**.
-3. Znajdź **HA Hypervisor** w HACS, pobierz i uruchom ponownie Home Assistanta.
+2. Przejdź do **Ustawienia, Marketplace** i zaakceptuj ostrzeżenie. Wybierz **Add from link** i połącz konto GitHub, gdy
+   HA o to poprosi: Marketplace wymaga tego przy repozytoriach dodawanych linkiem.
+3. Wpisz `https://github.com/franekSoftSF/HA-Hypervisor`, wybierz **Integration**, jeśli pojawi się pytanie o typ, i
+   wybierz **Add**. Otwórz **HA Hypervisor** i zainstaluj. Uruchom HA ponownie tylko wtedy, gdy poprosi o to naprawa.
 4. **Ustawienia, Urządzenia i usługi, Dodaj integrację, HA Hypervisor.** Podaj `agent_id` i klucz współdzielony.
 
 Hosty, maszyny i datastore'y pojawią się jako urządzenia w ciągu jednego cyklu odpytywania.
@@ -231,7 +232,7 @@ Idź krok po kroku, najlepiej gdy masz fizyczny dostęp do serwera:
 
 ## Aktualizacja
 
-Integracja: przez HACS. Agent:
+Integracja: przez Marketplace. Agent:
 
 ```bash
 git pull

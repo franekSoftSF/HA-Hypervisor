@@ -1,6 +1,6 @@
 # Status
 
-Version 0.2.0 (renamed from HA VMware), built for Home Assistant 2026.11.
+Version 0.2.1 (renamed from HA VMware), built for Home Assistant 2026.11.
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.

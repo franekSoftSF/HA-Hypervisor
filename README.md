@@ -50,7 +50,7 @@ In short, following the [installation guide](docs/installation.md):
 
 1. Mosquitto with a separate account for the agent.
 2. The agent in Docker on a machine outside the cluster, tested with its `check` command.
-3. In HACS add this repository as a custom Integration, install **HA Hypervisor**, restart, and add the integration.
+3. In **Settings, Marketplace, Add from link** enter this repository, install **HA Hypervisor**, and add the integration. HACS is not used: Home Assistant 2026.11 replaced it with the built-in Marketplace.
 
 ## Shutting the cluster down
 

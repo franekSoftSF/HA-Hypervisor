@@ -60,7 +60,7 @@ def test_translations_cover_every_code_in_both_languages():
         assert step in english["entity"]["sensor"]["operation_step"]["state"]
 
 
-def test_manifest_has_hacs_fields():
+def test_manifest_has_marketplace_fields():
     manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
     for key in ("domain", "documentation", "issue_tracker", "codeowners", "name", "version"):
         assert manifest[key]

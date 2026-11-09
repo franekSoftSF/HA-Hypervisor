@@ -1,7 +1,7 @@
 """Wire protocol between the Home Assistant integration and the agent.
 
 This file exists twice, in custom_components/ha_hypervisor and in agent/ha_hypervisor_agent,
-because HACS ships only the integration directory. Both copies must stay byte-identical
+because the Marketplace installs only the integration directory. Both copies must stay byte-identical
 (tests/test_protocol.py checks it). It must not import anything outside the standard
 library.
 """
