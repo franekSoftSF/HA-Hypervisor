@@ -1,0 +1,137 @@
+# Example dashboard. Replace "lab" in the entity ids with your agent_id,
+# and the VM and scenario names with your own.
+title: VMware
+views:
+  - title: VMware
+    path: vmware
+    icon: mdi:server
+    type: sections
+    max_columns: 4
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Cluster
+          - type: tile
+            entity: sensor.vmware_lab_cluster
+            name: { type: entity }
+          - type: tile
+            entity: binary_sensor.vmware_lab_vcenter
+            name: { type: entity }
+          - type: tile
+            entity: sensor.vmware_lab_cpu_usage
+            name: { type: entity }
+          - type: tile
+            entity: sensor.vmware_lab_memory_usage
+            name: { type: entity }
+          - type: tile
+            entity: sensor.vmware_lab_hosts_online
+            name: { type: entity }
+          - type: tile
+            entity: sensor.vmware_lab_vms_running
+            name: { type: entity }
+          - type: tile
+            entity: sensor.vmware_lab_operation
+            name: { type: entity }
+          - type: tile
+            entity: sensor.vmware_lab_operation_step
+            name: { type: entity }
+      - type: grid
+        cards:
+          - type: heading
+            heading: Control
+          - type: tile
+            entity: button.vmware_lab_start_cluster
+            name: { type: entity }
+            hide_state: true
+            tap_action:
+              action: toggle
+            grid_options:
+              columns: full
+          - type: tile
+            entity: button.vmware_lab_preview_shutdown
+            name: { type: entity }
+            hide_state: true
+            tap_action:
+              action: toggle
+            grid_options:
+              columns: full
+          - type: tile
+            entity: switch.vmware_lab_arm_cluster_shutdown
+            name: { type: entity }
+            grid_options:
+              columns: full
+          - type: tile
+            entity: button.vmware_lab_shut_down_cluster
+            name: { type: entity }
+            hide_state: true
+            tap_action:
+              action: toggle
+              confirmation: true
+            grid_options:
+              columns: full
+          - type: tile
+            entity: button.vmware_lab_cancel_operation
+            name: { type: entity }
+            hide_state: true
+            tap_action:
+              action: toggle
+            grid_options:
+              columns: full
+      - type: grid
+        cards:
+          - type: heading
+            heading: Virtual machines
+          - type: tile
+            entity: switch.dc01_power
+            name: { type: device }
+            grid_options:
+              columns: full
+          - type: tile
+            entity: switch.sql01_power
+            name: { type: device }
+            grid_options:
+              columns: full
+          - type: tile
+            entity: switch.web01_power
+            name: { type: device }
+            grid_options:
+              columns: full
+      - type: grid
+        cards:
+          - type: heading
+            heading: Scenarios
+          - type: tile
+            entity: sensor.vdi_test_state
+            name: { type: device }
+            grid_options:
+              columns: full
+          - type: tile
+            entity: button.vdi_test_start
+            name: { type: entity }
+            hide_state: true
+            tap_action:
+              action: toggle
+          - type: tile
+            entity: button.vdi_test_stop
+            name: { type: entity }
+            hide_state: true
+            tap_action:
+              action: toggle
+          - type: tile
+            entity: sensor.only_ad_state
+            name: { type: device }
+            grid_options:
+              columns: full
+          - type: tile
+            entity: button.only_ad_start
+            name: { type: entity }
+            hide_state: true
+            tap_action:
+              action: toggle
+          - type: tile
+            entity: button.only_ad_stop
+            name: { type: entity }
+            hide_state: true
+            tap_action:
+              action: toggle

@@ -44,3 +44,19 @@ services:
       PYTHONPATH: /src/agent
       PYTHONDONTWRITEBYTECODE: "1"
     command: ["python", "/src/tests/e2e/driver.py"]
+
+  # Regenerates docs/images from a running simulated lab.
+  screenshots:
+    build:
+      context: ../docker
+      dockerfile: screenshots.Dockerfile
+    profiles: [screenshots]
+    depends_on:
+      homeassistant:
+        condition: service_healthy
+    volumes:
+      - ../..:/src
+    environment:
+      PYTHONPATH: /src/agent:/src/tests/e2e
+      PYTHONDONTWRITEBYTECODE: "1"
+    command: ["python", "/src/tests/e2e/screenshots.py"]

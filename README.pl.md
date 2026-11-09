@@ -3,6 +3,13 @@
 Sterowanie laboratorium vCenter z Home Assistanta, gdy HA nie ma do niego bezpośredniego dostępu: statystyki,
 zasilanie maszyn, wyłączanie i uruchamianie klastra oraz scenariusze startu. Wersja angielska: [README.md](README.md).
 
+**[Instrukcja instalacji](docs/pl/installation.md)**
+
+![Panel](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/pl/dashboard.png)
+
+*Zrzuty pochodzą z Home Assistant 2026.11 połączonego z `vcsim`, symulatorem vSphere, dlatego większość wartości jest
+niska, a nazwy hostów są wygenerowane.*
+
 ```
 Home Assistant + ta integracja  <->  Mosquitto  <--MQTT po TLS--  agent
                                                                     |-- API vCenter
@@ -17,53 +24,32 @@ z klastrem i nic go już nie uruchomi.
 
 Wymaga Home Assistant 2026.11 lub nowszego oraz integracji MQTT.
 
+## Co dostajesz
+
+| Urządzenie | Encje |
+|---|---|
+| Agent / klaster | stan klastra, użycie CPU i pamięci, hosty online, działające maszyny, operacja i jej krok, przyciski: podgląd wyłączenia, wyłącz, uruchom, anuluj, odśwież, przełącznik odbezpieczenia |
+| Host | CPU, pamięć, czas działania, zasilanie, połączenie |
+| Maszyna | przełącznik zasilania (wyłączenie przez system gościa), wymuszone wyłączenie, CPU, pamięć, dysk, IP, host, VMware Tools |
+| Datastore | zajęte %, wolne, pojemność |
+| Scenariusz | uruchom, zatrzymaj, stan |
+
+Sensory liczbowe mają klasę stanu, więc HA przechowuje statystyki długoterminowe. Wartości pochodzą z szybkich
+liczników vSphere, przepustowość dysków i sieci nie jest zbierana.
+
+| Klaster | Maszyna wirtualna |
+|---|---|
+| ![Urządzenie klastra](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/pl/cluster-device.png) | ![Urządzenie maszyny](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/pl/vm-device.png) |
+
+Przykład powyższego panelu jest w [docs/dashboard.example.yaml](docs/dashboard.example.yaml).
+
 ## Instalacja
 
-### 1. Broker
+W skrócie, według [instrukcji instalacji](docs/pl/installation.md):
 
-Mosquitto obok HA, z osobnym kontem agenta ograniczonym do jego tematów:
-
-```
-user ha-vmware-agent
-topic readwrite ha_vmware/lab/#
-```
-
-Przy publicznym adresie HTTPS najprościej użyć MQTT po WebSocket przez to samo proxy (port 443), bez otwierania
-nowego portu. Działa też TLS na 8883. Nigdy nie wystawiaj połączenia bez szyfrowania ani dostępu anonimowego.
-
-### 2. Agent
-
-```bash
-cd agent
-cp config.example.yaml config.yaml
-docker compose -f docker-compose.example.yml run --rm --entrypoint ha-vmware-agent ha-vmware-agent genkey
-```
-
-Uzupełnij `config.yaml`, a hasła wpisz do `.env`. Potem sprawdź połączenia (niczego nie zmienia) i uruchom:
-
-```bash
-docker compose -f docker-compose.example.yml run --rm ha-vmware-agent check --config /config/config.yaml
-```
-
-```bash
-docker compose -f docker-compose.example.yml up -d
-```
-
-Zegar agenta musi być poprawny (NTP), bo polecenie wygasa po dwóch minutach.
-
-Potrzebne konta:
-
-- **vCenter**: rola z operacjami zasilania maszyn, wyłączaniem gościa i `Sessions.ValidateSession`, a dla trybu
-  Retreat vCLS także zmianą ustawień zaawansowanych.
-- **ESXi**: konto lokalne na każdym hoście, które może sterować maszynami i wyłączyć host. Tryb lockdown musi na to
-  pozwalać.
-- **BMC**: konto ze sterowaniem zasilaniem. Na Supermicro włącz w ustawieniach BMC IPMI over LAN lub Redfish.
-
-### 3. Home Assistant
-
-1. HACS, Custom repositories, dodaj to repozytorium jako Integration i zainstaluj **HA VMware**.
-2. Uruchom ponownie HA.
-3. Ustawienia, Urządzenia i usługi, Dodaj integrację, **HA VMware**: podaj `agent_id` i `shared_key`.
+1. Mosquitto z osobnym kontem dla agenta.
+2. Agent w Dockerze na urządzeniu poza klastrem, sprawdzony poleceniem `check`.
+3. W HACS dodaj to repozytorium jako własną integrację, zainstaluj **HA VMware**, uruchom ponownie HA i dodaj integrację.
 
 ## Wyłączanie klastra
 
@@ -79,8 +65,10 @@ vCenter nigdy nie jest wyłączana siłowo.
 
 ## Scenariusze
 
-Urządzenia i usługi, HA VMware, **Dodaj scenariusz**. Scenariusz to uporządkowana lista grup: maszyny w grupie
-startują razem, a następna grupa na nie czeka (VMware Tools, stan zasilania lub nic, plus dodatkowe opóźnienie).
+Scenariusz to uporządkowana lista grup: maszyny w grupie startują razem, a następna grupa na nie czeka (VMware Tools,
+stan zasilania lub nic, plus dodatkowe opóźnienie).
+
+![Kreator scenariusza](https://raw.githubusercontent.com/franekSoftSF/HA-Vmware/main/docs/images/pl/scenario-wizard.png)
 
 Uruchomienie scenariusza włącza też potrzebne hosty i vCenter, jeśli są wyłączone. Zatrzymanie działa w odwrotnej
 kolejności i nie rusza maszyn używanych przez inny aktywny scenariusz. W automatyzacji:
@@ -103,3 +91,5 @@ data:
 ```powershell
 .\tests\run.ps1 -E2E
 ```
+
+Wszystko działa w Dockerze. Prawdziwe wyłączenie ESXi i sterowanie BMC wymagają testu na sprzęcie.

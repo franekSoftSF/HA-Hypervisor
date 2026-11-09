@@ -280,8 +280,10 @@ def check(config: AgentConfig) -> int:
         power = infra.power(host)
         state = power.state()
         methods = ", ".join(method.name for method in power.methods) or "none"
-        if power.can_wake():
+        if power.verified():
             print(f"OK    Power {host.name}: {state} (methods: {methods})")  # noqa: T201
+        elif power.can_wake():
+            print(f"WARN  Power {host.name}: only Wake on LAN is left, it cannot be checked")  # noqa: T201
         else:
             failures += 1
             print(f"FAIL  Power {host.name}: no working method ({methods})")  # noqa: T201

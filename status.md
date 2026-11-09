@@ -14,6 +14,5 @@ Version 0.1.0, built for Home Assistant 2026.11.
 - MQTT over WebSocket through the real reverse proxy.
 
 ## Next
-1. Publish a public GitHub repository, required by HACS, with description and topics, and a first release.
-2. Deploy the agent and run `check`, then a shutdown preview, then a real cycle.
-3. Possible additions: disk and network statistics through PerformanceManager, BMC sensors (power draw, temperature).
+1. Deploy the agent and run `check`, then a shutdown preview, then a real cycle.
+2. Possible additions: disk and network statistics through PerformanceManager, BMC sensors (power draw, temperature).
