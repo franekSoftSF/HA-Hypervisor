@@ -4,11 +4,11 @@
   "categories": ["computers_network.nas_servers", "computers_network.monitoring"],
   "codeowners": ["@franekSoftSF"],
   "config_flow": true,
-  "dependencies": ["mqtt"],
+  "dependencies": ["frontend", "http", "mqtt", "panel_custom", "websocket_api"],
   "documentation": "https://github.com/franekSoftSF/HA-Hypervisor",
   "integration_type": "hub",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/franekSoftSF/HA-Hypervisor/issues",
   "requirements": [],
-  "version": "0.3.2"
+  "version": "0.4.0"
 }

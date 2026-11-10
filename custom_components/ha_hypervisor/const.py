@@ -17,3 +17,5 @@ CONF_POWER_OFF_EMPTY = "power_off_empty_hosts"
 COMMAND_TIMEOUT = 15
 AGENT_DISCOVERY_TIMEOUT = 15
 ARM_SECONDS = 60
+AGENT_CHECK_SECONDS = 60
+RELEASES_URL = "https://github.com/franekSoftSF/HA-Hypervisor/releases/latest"

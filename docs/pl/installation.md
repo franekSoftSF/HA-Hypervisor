@@ -142,7 +142,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.3.2
+VERSION=0.4.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -273,10 +273,36 @@ Na stronie integracji wybierz **Dodaj scenariusz**, podaj nazwę i kolejno dodaw
 
 ### Panel
 
-Utwórz panel, otwórz edytor surowej konfiguracji i wklej [dashboard.example.yaml](../dashboard.example.yaml), zamieniając
-`lab`, nazwy maszyn i nazwy scenariuszy na swoje.
+Integracja sama dodaje **Hypervisor** do menu bocznego. Panel powstaje z tego, co zgłaszają agenci: klaster, przyciski
+sterowania, hosty, włączone i wyłączone maszyny, scenariusze i magazyny danych. Nowe maszyny pojawiają się bez żadnej
+edycji, a maszyna przechodzi między „Włączone” i „Wyłączone” razem ze zmianą stanu. Przy kilku agentach każdy ma swój blok.
 
-![Przykładowy panel](../images/pl/dashboard.png)
+![Panel Hypervisor](../images/pl/dashboard.png)
+
+Aby go ukryć, przytrzymaj tytuł menu bocznego i ukryj pozycję. Jeśli wolisz własny panel, zacznij od
+[dashboard.example.yaml](../dashboard.example.yaml).
+
+### Automatyzacje, Stream Deck i inne panele przycisków
+
+Każda maszyna, którą można włączać z Home Assistant, ma przełącznik, np. `switch.web01_power`. Włączenie uruchamia
+maszynę, wyłączenie zamyka system gościa (VMware Tools). Używaj zwykłych akcji:
+
+```yaml
+action: switch.toggle            # albo switch.turn_on / switch.turn_off
+target:
+  entity_id: switch.web01_power
+```
+
+Tak samo działa wtyczka Home Assistant w Stream Decku lub Macro Decku: wybierz encję przełącznika i akcję przełączenia,
+przycisk pokaże też stan maszyny. Scenariusze i klaster działają tak samo przez swoje przyciski (`button.press`) albo akcje
+`ha_hypervisor.start_scenario` i `ha_hypervisor.stop_scenario`. Wyłączenie klastra zawsze wymaga najpierw przełącznika
+odbezpieczenia, także z panelu przycisków.
+
+### Sprawdzenie agenta po aktualizacji
+
+Po każdym starcie Home Assistant, także po aktualizacji integracji, integracja pyta każdego agenta o stan. W **Ustawienia →
+System → Naprawy** pojawi się zgłoszenie, gdy agent nie odpowie w ciągu minuty albo gdy jest starszy niż integracja
+i trzeba go zaktualizować.
 
 ## 7. Pierwszy test
 

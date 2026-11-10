@@ -10,10 +10,10 @@ from typing import Any
 from homeassistant.components import mqtt
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
-from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import device_registry as dr, issue_registry as ir
 from homeassistant.helpers.event import async_call_later
 
-from .const import ARM_SECONDS, COMMAND_TIMEOUT, DOMAIN
+from .const import AGENT_CHECK_SECONDS, ARM_SECONDS, COMMAND_TIMEOUT, DOMAIN, RELEASES_URL
 from .protocol import (
     CMD_CANCEL,
     CMD_CLUSTER_SHUTDOWN,
@@ -43,6 +43,14 @@ _LOGGER = logging.getLogger(__name__)
 _QOS = 1
 
 
+def parse_version(text: Any) -> tuple[int, ...] | None:
+    """Return a version such as 0.3.2 as numbers, None when it is not one."""
+    try:
+        return tuple(int(part) for part in str(text).split("."))
+    except ValueError:
+        return None
+
+
 def agent_error(code: str) -> HomeAssistantError:
     """Return a translated error for a code sent by the agent."""
     key = code if code in ERROR_CODES else "internal_error"
@@ -53,10 +61,17 @@ class AgentLink:
     """Keeps the verified agent data and sends signed commands."""
 
     def __init__(
-        self, hass: HomeAssistant, entry_id: str, agent_id: str, shared_key: str
+        self,
+        hass: HomeAssistant,
+        entry_id: str,
+        agent_id: str,
+        shared_key: str,
+        integration_version: str | None = None,
     ) -> None:
         """Start without any data."""
         self.hass = hass
+        self.integration_version = integration_version
+        self._check: CALLBACK_TYPE | None = None
         self._entry_id = entry_id
         self.agent_id = agent_id
         self._key = shared_key
@@ -88,6 +103,67 @@ class AgentLink:
                 )
             )
         await self._async_request_announce()
+        # After an update or restart of Home Assistant: does the agent answer?
+        self._check = async_call_later(
+            self.hass, AGENT_CHECK_SECONDS, self._async_check_reachable
+        )
+
+    @property
+    def _issue_unreachable(self) -> str:
+        return f"agent_unreachable_{self.agent_id}"
+
+    @property
+    def _issue_outdated(self) -> str:
+        return f"agent_outdated_{self.agent_id}"
+
+    @callback
+    def _async_check_reachable(self, _now: Any = None) -> None:
+        self._check = None
+        if self.online:
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self._issue_unreachable,
+            is_fixable=False,
+            severity=ir.IssueSeverity.ERROR,
+            translation_key="agent_unreachable",
+            translation_placeholders={"agent_id": self.agent_id},
+        )
+
+    @callback
+    def _async_check_version(self) -> None:
+        """Raise a repair when the agent is older than the integration."""
+        agent_version = (self.info or {}).get("agent_version")
+        agent = parse_version(agent_version)
+        ours = parse_version(self.integration_version)
+        if agent is None or ours is None or agent >= ours:
+            ir.async_delete_issue(self.hass, DOMAIN, self._issue_outdated)
+            return
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self._issue_outdated,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            learn_more_url=RELEASES_URL,
+            translation_key="agent_outdated",
+            translation_placeholders={
+                "agent_id": self.agent_id,
+                "agent_version": str(agent_version),
+                "version": str(self.integration_version),
+            },
+        )
+
+    @callback
+    def async_remove_issues(self) -> None:
+        """Forget the repairs of an agent that is removed."""
+        ir.async_delete_issue(self.hass, DOMAIN, self._issue_unreachable)
+        ir.async_delete_issue(self.hass, DOMAIN, self._issue_outdated)
+
+    @callback
+    def _async_seen_online(self) -> None:
+        ir.async_delete_issue(self.hass, DOMAIN, self._issue_unreachable)
 
     async def _async_request_announce(self) -> None:
         """Ask the agent to repeat its status.
@@ -120,6 +196,9 @@ class AgentLink:
         for unsubscribe in self._unsubscribe:
             unsubscribe()
         self._unsubscribe.clear()
+        if self._check is not None:
+            self._check()
+            self._check = None
         self.disarm()
         for future in self._pending.values():
             future.cancel()
@@ -173,6 +252,8 @@ class AgentLink:
     @callback
     def _on_status(self, message: mqtt.ReceiveMessage) -> None:
         self.online = message.payload == STATUS_ONLINE
+        if self.online:
+            self._async_seen_online()
         self._notify()
 
     @callback
@@ -180,6 +261,7 @@ class AgentLink:
         if envelope := self._open(message, LEAF_INFO):
             self.info = envelope.body
             self.async_update_agent_device()
+            self._async_check_version()
             self._notify()
 
     @callback
@@ -190,6 +272,7 @@ class AgentLink:
             # shows what it last said, it may be long gone.
             if not message.retain:
                 self.online = True
+                self._async_seen_online()
             self._notify()
 
     @callback

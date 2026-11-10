@@ -41,7 +41,8 @@ liczników vSphere, przepustowość dysków i sieci nie jest zbierana.
 |---|---|
 | ![Urządzenie klastra](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/pl/cluster-device.png) | ![Urządzenie maszyny](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/pl/vm-device.png) |
 
-Przykład powyższego panelu jest w [docs/dashboard.example.yaml](docs/dashboard.example.yaml).
+Panel **Hypervisor** powyżej integracja dodaje sama do menu bocznego i buduje go z tego, co zgłasza agent.
+Przełączniki maszyn działają w automatyzacjach i z przycisków Stream Decka lub Macro Decka (`switch.toggle`).
 
 ## Instalacja
 

@@ -42,7 +42,8 @@ stats: disk and network throughput are not collected.
 |---|---|
 | ![Cluster device](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/en/cluster-device.png) | ![VM device](https://raw.githubusercontent.com/franekSoftSF/HA-Hypervisor/main/docs/images/en/vm-device.png) |
 
-An example of the dashboard above is in [docs/dashboard.example.yaml](docs/dashboard.example.yaml).
+The **Hypervisor** panel above is added to the sidebar by the integration and builds itself from what the agent
+reports. VM switches work in automations and from Stream Deck or Macro Deck keys (`switch.toggle`).
 
 ## Installation
 

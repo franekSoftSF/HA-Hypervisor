@@ -11,7 +11,6 @@ from playwright.sync_api import Page, sync_playwright
 from pyVim.connect import SmartConnect
 from pyVmomi import vim
 import requests
-import yaml
 
 import driver
 from driver import AGENT, BASE, CLIENT, KEY, api, flow, state, step, wait
@@ -19,13 +18,7 @@ from driver import AGENT, BASE, CLIENT, KEY, api, flow, state, step, wait
 ROOT = Path("/src")
 IMAGES = ROOT / "docs" / "images"
 VM_NAMES = ["dc01", "sql01", "web01"]
-DASHBOARD = "ha-hypervisor"
-DASHBOARD_PL = {
-    "Cluster": "Klaster",
-    "Control": "Sterowanie",
-    "Virtual machines": "Maszyny wirtualne",
-    "Scenarios": "Scenariusze",
-}
+PANEL = "hypervisor"
 LANGUAGES = {
     "en": {"add": "Add scenario", "pick": "Add", "submit": "Submit", "scenario": "VDI test"},
     "pl": {"add": "Dodaj scenariusz", "pick": "Utwórz", "submit": "Zatwierdź", "scenario": "Test VDI"},
@@ -166,27 +159,16 @@ def set_language(page: Page, language: str, entry_id: str) -> None:
     wait("entities after language change", lambda: state("sensor.hypervisor_e2e_cluster") == "on", 30)
 
 
-def save_dashboard(page: Page, language: str) -> None:
-    text = (ROOT / "docs" / "dashboard.example.yaml").read_text(encoding="utf-8")
-    text = text.replace("hypervisor_lab_", "hypervisor_e2e_")
-    if language == "pl":
-        for english, polish in DASHBOARD_PL.items():
-            text = text.replace(f"heading: {english}", f"heading: {polish}")
-    hass_ws(
-        page,
-        {"type": "lovelace/config/save", "url_path": DASHBOARD, "config": yaml.safe_load(text)},
-    )
-
-
 def capture(page: Page, language: str, entry_id: str) -> None:
     step(f"capturing {language}")
     labels = LANGUAGES[language]
     set_language(page, language, entry_id)
-    save_dashboard(page, language)
 
     page.set_viewport_size({"width": 1500, "height": 820})
-    page.goto(f"{BASE}/{DASHBOARD}/hypervisor")
+    page.goto(f"{BASE}/{PANEL}")
     settle(page, 6)
+    tiles = page.locator("ha-hypervisor-panel hui-tile-card").count()
+    assert tiles > 20, f"panel shows {tiles} tiles"
     shot(page, language, "dashboard")
 
     page.set_viewport_size({"width": 1400, "height": 1320})
@@ -233,18 +215,6 @@ def main() -> None:
         page = context.new_page()
         page.goto(BASE)
         settle(page, 5)
-        hass_ws(
-            page,
-            {
-                "type": "lovelace/dashboards/create",
-                "url_path": DASHBOARD,
-                "title": "Hypervisor",
-                "icon": "mdi:server",
-                "show_in_sidebar": True,
-                "require_admin": False,
-                "mode": "storage",
-            },
-        )
         for language in LANGUAGES:
             capture(page, language, entry_id)
         browser.close()

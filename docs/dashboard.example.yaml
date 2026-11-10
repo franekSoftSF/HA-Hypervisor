@@ -1,5 +1,5 @@
-# Example dashboard. Replace "lab" in the entity ids with your agent_id,
-# and the VM and scenario names with your own.
+# Example of a hand-made dashboard. The integration already adds an automatic
+# Hypervisor panel to the sidebar, use this only to build your own.
 title: Hypervisor
 views:
   - title: Hypervisor

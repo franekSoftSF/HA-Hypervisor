@@ -64,7 +64,8 @@ def test_manifest_has_marketplace_fields():
     manifest = json.loads((COMPONENT / "manifest.json").read_text(encoding="utf-8"))
     for key in ("domain", "documentation", "issue_tracker", "codeowners", "name", "version"):
         assert manifest[key]
-    assert manifest["dependencies"] == ["mqtt"]
+    assert "mqtt" in manifest["dependencies"]
+    assert "panel_custom" in manifest["dependencies"]
     assert (COMPONENT / "brand" / "icon.png").exists()
 
 

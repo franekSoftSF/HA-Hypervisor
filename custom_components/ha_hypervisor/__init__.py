@@ -9,10 +9,13 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.device_registry import DeviceEntry
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.typing import ConfigType
+from homeassistant.loader import async_get_integration
 
 from .const import CONF_AGENT_ID, CONF_SHARED_KEY, DOMAIN
 from .link import AgentLink
+from .panel import async_add_panel, async_remove_panel, async_setup_panel_support
 from .services import async_setup_services
 
 PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.SENSOR, Platform.SWITCH]
@@ -22,8 +25,9 @@ type HaHypervisorConfigEntry = ConfigEntry[AgentLink]
 
 
 async def async_setup(hass: HomeAssistant, _config: ConfigType) -> bool:
-    """Register the actions."""
+    """Register the actions and what the sidebar panel needs."""
     async_setup_services(hass)
+    await async_setup_panel_support(hass)
     return True
 
 
@@ -33,8 +37,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaHypervisorConfigEntry)
         raise ConfigEntryNotReady(
             translation_domain=DOMAIN, translation_key="mqtt_not_ready"
         )
+    integration = await async_get_integration(hass, DOMAIN)
     link = AgentLink(
-        hass, entry.entry_id, entry.data[CONF_AGENT_ID], entry.data[CONF_SHARED_KEY]
+        hass,
+        entry.entry_id,
+        entry.data[CONF_AGENT_ID],
+        entry.data[CONF_SHARED_KEY],
+        str(integration.version) if integration.version else None,
     )
     await link.async_start()
     entry.runtime_data = link
@@ -44,6 +53,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: HaHypervisorConfigEntry)
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     link.async_update_agent_device()
+    await async_add_panel(hass)
 
 
 async def _async_reload(hass: HomeAssistant, entry: HaHypervisorConfigEntry) -> None:
@@ -52,7 +62,15 @@ async def _async_reload(hass: HomeAssistant, entry: HaHypervisorConfigEntry) -> 
 
 async def async_unload_entry(hass: HomeAssistant, entry: HaHypervisorConfigEntry) -> None:
     """Disconnect from the agent."""
+    async_remove_panel(hass, entry.entry_id)
     await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: HaHypervisorConfigEntry) -> None:
+    """Forget the repairs of a removed agent."""
+    agent_id = entry.data[CONF_AGENT_ID]
+    for issue in (f"agent_unreachable_{agent_id}", f"agent_outdated_{agent_id}"):
+        ir.async_delete_issue(hass, DOMAIN, issue)
 
 
 async def async_remove_config_entry_device(

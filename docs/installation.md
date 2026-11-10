@@ -141,7 +141,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.3.2
+VERSION=0.4.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -272,10 +272,36 @@ On the integration page choose **Add scenario**, enter a name, and add groups of
 
 ### Dashboard
 
-Create a dashboard, open the raw configuration editor and paste [dashboard.example.yaml](dashboard.example.yaml),
-replacing `lab`, the VM names and the scenario names with yours.
+The integration adds **Hypervisor** to the sidebar by itself. The panel is built from what the agents report: cluster,
+control buttons, hosts, running and stopped VMs, scenarios and datastores. New VMs show up without any editing, and a
+VM moves between "Running" and "Stopped" as its state changes. With several agents each gets its own block.
 
-![Example dashboard](images/en/dashboard.png)
+![Hypervisor panel](images/en/dashboard.png)
+
+To hide it, long-press the sidebar title and hide the entry. To build your own dashboard instead, start from
+[dashboard.example.yaml](dashboard.example.yaml).
+
+### Automations, Stream Deck and other button pads
+
+Every VM that can be powered from Home Assistant has a switch, for example `switch.web01_power`. On turns the VM on,
+off shuts the guest down cleanly (VMware Tools). Use the ordinary actions:
+
+```yaml
+action: switch.toggle            # or switch.turn_on / switch.turn_off
+target:
+  entity_id: switch.web01_power
+```
+
+The same works from a Stream Deck or Macro Deck plugin for Home Assistant: choose the switch entity and the toggle
+action, the key then also shows the VM state. Scenarios and the cluster work the same way through their buttons
+(`button.press`) or the actions `ha_hypervisor.start_scenario` and `ha_hypervisor.stop_scenario`. A cluster shutdown
+always needs the arm switch first, also from a button pad.
+
+### Agent check after updates
+
+After every start of Home Assistant, also after updating the integration, it asks each agent for its status. A repair
+appears under **Settings → System → Repairs** when an agent has not answered within a minute, or when the agent is
+older than the integration and should be updated.
 
 ## 7. First test
 

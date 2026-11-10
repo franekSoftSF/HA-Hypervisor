@@ -164,6 +164,16 @@
       "vm_power": { "name": "Power" }
     }
   },
+  "issues": {
+    "agent_unreachable": {
+      "title": "Agent {agent_id} does not answer",
+      "description": "Home Assistant asked agent {agent_id} for its status after starting and got no answer. Check on the agent machine: `sudo systemctl status ha-hypervisor-agent` and `sudo ha-hypervisor-agent check`. This message disappears as soon as the agent connects."
+    },
+    "agent_outdated": {
+      "title": "Agent {agent_id} is older than the integration",
+      "description": "The agent runs version {agent_version}, the integration is {version}. Install the newer .deb package on the agent machine and restart the service: `sudo systemctl restart ha-hypervisor-agent`."
+    }
+  },
   "exceptions": {
     "mqtt_not_ready": { "message": "The MQTT integration is not connected." },
     "agent_offline": { "message": "The agent is offline." },

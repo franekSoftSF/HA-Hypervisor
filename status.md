@@ -1,11 +1,13 @@
 # Status
 
-Version 0.3.0 (renamed from HA VMware), built for Home Assistant 2026.11.
+Version 0.4.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
 - Integration: config flow, entities, scenario wizard, actions, EN and PL translations, diagnostics.
 - Agent packaged as .deb (amd64, arm64) with a systemd service and a CLI for MQTT, vCenter and ESXi connections.
+- Automatic Hypervisor sidebar panel (frontend/panel.js plus the ha_hypervisor/dashboard websocket command).
+- Repairs after every start: agent not answering within a minute, agent older than the integration.
 - Tests in Docker on the real Home Assistant 2026.11 image, hassfest, end-to-end stack with `vcsim`.
 
 ## Not verified on real hardware
@@ -15,7 +17,7 @@ Version 0.3.0 (renamed from HA VMware), built for Home Assistant 2026.11.
 - MQTT over WebSocket through the real reverse proxy.
 
 ## Next
-1. Deploy the agent and run `check`, then a shutdown preview, then a real cycle.
+1. On the Supermicro: add the BMC to host 172.16.2.20, then a shutdown preview, then a real cycle.
 2. Proxmox VE and mixed scenarios, only after step 1 passes. See the plan below.
 3. Possible additions: disk and network statistics through PerformanceManager, BMC sensors (power draw, temperature).
 
