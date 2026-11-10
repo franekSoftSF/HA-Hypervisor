@@ -314,16 +314,27 @@ class AgentService:
         self._infra.close()
 
 
-def _check_power(infra: Any, host: Any) -> int:
-    """Print the power line of a host, return 1 when it cannot be woken."""
-    power = infra.power(host)
+def _check_power(infra: Any, host: Any, *, proxmox: bool = False) -> int:
+    return check_power(infra.power(host), host, proxmox=proxmox)
+
+
+def check_power(power: Any, host: Any, *, proxmox: bool = False) -> int:
+    """Print the power line of a host, return 1 when it cannot be started again."""
+    from .pve import local_node_name  # noqa: PLC0415
+
     state = power.state()
     methods = ", ".join(method.name for method in power.methods) or "none"
+    if proxmox and host.name == local_node_name():
+        print(f"OK    Power {host.name}: this node runs the agent, power it on by hand")  # noqa: T201
+        return 0
     if power.verified():
         print(f"OK    Power {host.name}: {state} (methods: {methods})")  # noqa: T201
         return 0
     if power.can_wake():
         print(f"WARN  Power {host.name}: only Wake on LAN is left, it cannot be checked")  # noqa: T201
+        return 0
+    if host.manual_power_on:
+        print(f"OK    Power {host.name}: powered on by hand (manual power on)")  # noqa: T201
         return 0
     print(f"FAIL  Power {host.name}: no working method ({methods})")  # noqa: T201
     return 1
@@ -356,7 +367,7 @@ def _check_proxmox(config: AgentConfig) -> int:
                 f"OK    Proxmox {host.name}: {version}, {kind}{quorum}, "
                 f"{len(ha)} HA resources"
             )
-        failures += _check_power(infra, host)
+        failures += _check_power(infra, host, proxmox=True)
     if not config.hosts:
         failures += 1
         print("MISSING Proxmox nodes: run node add")  # noqa: T201

@@ -182,6 +182,12 @@ licencji i wtedy agent przechodzi na IPMI.
 **Wake on LAN** to opcjonalna ostateczność. Karta sieciowa i BIOS muszą obsługiwać wybudzanie z pełnego wyłączenia,
 agent musi być w tym samym segmencie sieci, a działania nie da się sprawdzić z wyprzedzeniem. Przetestuj je raz ręcznie.
 
+**Bez BMC i bez Wake on LAN.** Dodaj host z `--manual-power-on` (np.
+`esxi add 172.16.2.20 --update --manual-power-on`). Agent wyłączy go wtedy jak każdy inny, podgląd pokaże ostrzeżenie
+`manual_power_on:HOST`, a **Uruchom klaster** poczeka do `host_start` (15 minut), aż ktoś naciśnie przycisk zasilania,
+i dalej uruchomi vCenter i resztę. Bez tej opcji taki host blokuje wyłączenie, więc laboratorium, którego nikt nie
+włączy z powrotem, nigdy nie zostanie wyłączone przypadkiem.
+
 ## 5. Agent
 
 ### Instalacja paczki
@@ -190,7 +196,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.6.1
+VERSION=0.7.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -316,7 +322,7 @@ którego nie da się sprawdzić. W logu powinien pojawić się wpis `Connected t
 | `--instance NAZWA` (z dowolnym poleceniem) | Kolejny agent na tej samej maszynie, usługa `ha-hypervisor-agent@NAZWA` |
 
 Każde polecenie ma `--help`. Opcje `esxi add` to m.in. `--address`, `--bmc-type`, `--wol-mac`, `--wol-broadcast`,
-`--no-bmc` i `--no-wol`.
+`--no-bmc`, `--no-wol` i `--manual-power-on`.
 
 Po zmianie konfiguracji uruchom usługę ponownie: `sudo systemctl restart ha-hypervisor-agent`. Każde polecenie o tym przypomina. Agent łączy się z Home Assistantem już po ustawieniu MQTT: do czasu dodania vCenter i hosta pokazuje klaster jako **Nieskonfigurowany**, więc integrację można dodać wcześniej.
 

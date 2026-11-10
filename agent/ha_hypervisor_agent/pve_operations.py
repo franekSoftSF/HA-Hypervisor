@@ -21,7 +21,7 @@ from .errors import GuestNotFound, PlatformError, PlatformUnavailable
 from .inventory import View, is_system_vm
 from .operations import OperationFailed, Orchestrator
 from .protocol import OP_COMPLETED
-from .power import POWER_OFF, PowerError
+from .power import POWER_OFF
 from .pve import (
     HA_STARTED,
     ProxmoxClient,
@@ -84,11 +84,9 @@ class ProxmoxOrchestrator(Orchestrator):
                 # The agent stops with this node: it cannot power it on again.
                 warnings.append(f"self_hosted:{host.name}")
                 continue
-            power = self._infra.power(host)
-            if not power.can_wake():
-                raise OperationFailed("no_wake_method", host.name)
-            if not power.verified():
-                warnings.append(f"wake_unverified:{host.name}")
+            warning = self._check_wake(host)
+            if warning:
+                warnings.append(warning)
             hosts.append(host.name)
 
         own = [name for name in view.hosts if self._is_self(name) and view.hosts[name]["connected"]]
@@ -200,13 +198,7 @@ class ProxmoxOrchestrator(Orchestrator):
 
         self._step("wake_hosts", ", ".join(names))
         for host in hosts:
-            if self._infra.reachable(host):
-                continue
-            try:
-                method = self._infra.power(host).power_on()
-            except PowerError as err:
-                raise OperationFailed("wake_failed", f"{host.name}: {err}") from err
-            _LOGGER.info("Woke %s with %s", host.name, method)
+            self._wake(host)
 
         self._step("wait_hosts", ", ".join(names))
         for host in hosts:

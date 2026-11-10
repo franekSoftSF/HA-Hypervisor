@@ -31,7 +31,7 @@ from .config import (
 )
 from .power import HostPower
 from .protocol import generate_key, is_valid_agent_id
-from .service import AgentService, check, test_mqtt
+from .service import AgentService, check, check_power, test_mqtt
 from .vim import VimClient, VimError, VimUnavailable
 
 _GROUP = "ha-hypervisor-agent"
@@ -495,6 +495,11 @@ def _host_add(args: argparse.Namespace, *, proxmox: bool) -> int:
         )
     _merge_bmc(args, entry)
     _merge_wol(args, entry)
+    if args.manual_power_on is not None:
+        if args.manual_power_on:
+            entry["manual_power_on"] = True
+        else:
+            entry.pop("manual_power_on", None)
     build_host(entry)
 
     if index is None:
@@ -505,7 +510,13 @@ def _host_add(args: argparse.Namespace, *, proxmox: bool) -> int:
     target.save(data)
     _say(f"Saved host {args.name}")
     if "bmc" not in entry and "wol" not in entry:
-        _say("Warning: without --bmc-address or --wol-mac the agent cannot power this host on.")
+        if entry.get("manual_power_on"):
+            _say("No BMC or Wake on LAN: the agent shuts this host down, a person powers it on.")
+        else:
+            _say(
+                "Warning: without --bmc-address or --wol-mac the agent cannot power this host on. "
+                "A shutdown is refused, unless --manual-power-on says it is powered on by hand."
+            )
     _after_change()
     return 0
 
@@ -578,15 +589,7 @@ def cmd_node_test(args: argparse.Namespace) -> int:
             for name in nodes:
                 if config.host(name) is None:
                     _say(f"      node {name}: NOT configured, use node add")
-        power = infra.power(host)
-        methods = ", ".join(method.name for method in power.methods) or "none"
-        if power.verified():
-            _say(f"OK    Power {host.name}: {power.state()} (methods: {methods})")
-        elif power.can_wake():
-            _say(f"WARN  Power {host.name}: only Wake on LAN is left, it cannot be checked")
-        else:
-            failures += 1
-            _say(f"FAIL  Power {host.name}: no working method ({methods})")
+        failures += check_power(infra.power(host), host, proxmox=True)
     return 1 if failures else 0
 
 
@@ -601,6 +604,8 @@ def cmd_esxi_list(args: argparse.Namespace) -> int:
             power.append(f"bmc {host['bmc']['address']} ({host['bmc'].get('type', 'auto')})")
         if host.get("wol"):
             power.append(f"wol {host['wol']['mac']}")
+        if host.get("manual_power_on"):
+            power.append("manual power on")
         _say(f"{host['name']}  {host['address']}  {', '.join(power) or 'no power control'}")
     return 0
 
@@ -640,15 +645,7 @@ def cmd_esxi_test(args: argparse.Namespace) -> int:
         else:
             _say(f"OK    ESXi {host.name}: {len(inventory['vms'])} VMs")
             client.disconnect()
-        power = HostPower.for_host(host)
-        methods = ", ".join(method.name for method in power.methods) or "none"
-        if power.verified():
-            _say(f"OK    Power {host.name}: {power.state()} (methods: {methods})")
-        elif power.can_wake():
-            _say(f"WARN  Power {host.name}: only Wake on LAN is left, it cannot be checked")
-        else:
-            failures += 1
-            _say(f"FAIL  Power {host.name}: no working method ({methods})")
+        failures += check_power(HostPower.for_host(host), host)
     return 1 if failures else 0
 
 
@@ -846,6 +843,11 @@ def _add_hosts(commands: Any, common: argparse.ArgumentParser, *, proxmox: bool)
     wol.add_argument("--wol-mac")
     wol.add_argument("--wol-broadcast")
     wol.add_argument("--no-wol", action="store_true", help="remove Wake on LAN")
+    _bool_option(
+        item,
+        "--manual-power-on",
+        "no BMC or Wake on LAN: allow shutting it down, a person powers it on and the start waits",
+    )
     item.set_defaults(handler=cmd_node_add if proxmox else cmd_esxi_add)
 
     group.add_parser("list", parents=[common], help=f"list the {noun}s").set_defaults(

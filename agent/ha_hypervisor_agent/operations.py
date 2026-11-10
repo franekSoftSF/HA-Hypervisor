@@ -283,6 +283,35 @@ class Orchestrator:
         if seconds > 0 and self._cancel.wait(seconds):
             raise OperationCancelled
 
+    def _check_wake(self, host: HostConfig) -> str | None:
+        """Refuse a host that could not be started again, return a warning or None."""
+        power = self._infra.power(host)
+        if not power.can_wake():
+            if host.manual_power_on:
+                # Accepted in the configuration: someone presses the button.
+                return f"manual_power_on:{host.name}"
+            raise OperationFailed("no_wake_method", host.name)
+        if not power.verified():
+            return f"wake_unverified:{host.name}"
+        return None
+
+    def _wake(self, host: HostConfig) -> None:
+        """Power a host on, or wait for a person to do it when so configured."""
+        if self._infra.reachable(host):
+            return
+        power = self._infra.power(host)
+        if host.manual_power_on and not power.methods:
+            _LOGGER.warning("Waiting for %s to be powered on by hand", host.name)
+            return
+        try:
+            method = power.power_on()
+        except PowerError as err:
+            if host.manual_power_on:
+                _LOGGER.warning("%s: %s, waiting for it to be powered on by hand", host.name, err)
+                return
+            raise OperationFailed("wake_failed", f"{host.name}: {err}") from err
+        _LOGGER.info("Woke %s with %s", host.name, method)
+
     def _host(self, name: str | None) -> HostConfig:
         host = self._config.host(name) if name else None
         if host is None:
@@ -327,11 +356,9 @@ class Orchestrator:
         for item in active_hosts:
             host = self._host(item["id"])
             self._esxi(host)
-            power = self._infra.power(host)
-            if not power.can_wake():
-                raise OperationFailed("no_wake_method", host.name)
-            if not power.verified():
-                warnings.append(f"wake_unverified:{host.name}")
+            warning = self._check_wake(host)
+            if warning:
+                warnings.append(warning)
             hosts.append(host.name)
 
         running = [
@@ -498,13 +525,7 @@ class Orchestrator:
 
         self._step("wake_hosts", ", ".join(names))
         for host in hosts:
-            if self._infra.reachable(host):
-                continue
-            try:
-                method = self._infra.power(host).power_on()
-            except PowerError as err:
-                raise OperationFailed("wake_failed", f"{host.name}: {err}") from err
-            _LOGGER.info("Woke %s with %s", host.name, method)
+            self._wake(host)
 
         self._step("wait_hosts", ", ".join(names))
         for host in hosts:

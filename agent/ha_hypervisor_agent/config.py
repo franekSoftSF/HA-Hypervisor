@@ -90,6 +90,8 @@ class HostConfig:
     verify_ssl: bool = False
     bmc: BmcConfig | None = None
     wol: WolConfig | None = None
+    # No BMC and no Wake on LAN on purpose: a person powers the host on.
+    manual_power_on: bool = False
 
 
 @dataclass(frozen=True)

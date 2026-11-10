@@ -218,7 +218,7 @@
     "agent_host_not_configured": { "message": "Brak hosta w konfiguracji agenta." },
     "agent_host_stop_timeout": { "message": "Host nie wyłączył się na czas." },
     "agent_host_start_timeout": { "message": "Host nie uruchomił się na czas." },
-    "agent_no_wake_method": { "message": "Hosta nie dałoby się ponownie uruchomić, więc wyłączenie zostało odrzucone." },
+    "agent_no_wake_method": { "message": "Hosta nie dałoby się ponownie uruchomić, więc wyłączenie zostało odrzucone. Dodaj jego BMC lub Wake on LAN albo zezwól na ręczne włączanie: esxi add (lub node add) NAZWA --update --manual-power-on." },
     "agent_wake_failed": { "message": "Nie udało się włączyć hosta." },
     "agent_protected_vm_running": { "message": "Działa maszyna chroniona." },
     "agent_vm_protected": { "message": "Ta maszyna jest chroniona." },

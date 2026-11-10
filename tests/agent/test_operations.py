@@ -360,3 +360,79 @@ def test_store_never_holds_secrets(harness):
     harness.run(SHUTDOWN)
     text = open(harness.config.state_file, encoding="utf-8").read()
     assert harness.config.shared_key not in text
+
+
+# ------------------------------------------------- powered on by hand
+
+
+def _manual_harness(lab, tmp_path, timeouts=None):
+    from conftest import Harness
+
+    hosts = [
+        {"name": "h1", "address": "h1", "username": "u", "password": "p"},
+        {"name": "h2", "address": "h2", "username": "u", "password": "p", "manual_power_on": True},
+    ]
+    config = make_config(tmp_path, hosts=hosts)
+    if timeouts:
+        import dataclasses
+
+        config = dataclasses.replace(config, timeouts=dataclasses.replace(config.timeouts, **timeouts))
+    store = Store(config.state_file)
+    updates = []
+    return Harness(lab, config, store, Orchestrator(config, FakeInfra(lab), store, updates.append), updates)
+
+
+def test_host_without_bmc_can_be_shut_down_when_powered_on_by_hand(lab, tmp_path):
+    lab.can_wake["h2"] = False
+    lab.add("web", "h2")
+    harness = _manual_harness(lab, tmp_path)
+    op = harness.run(SHUTDOWN)
+    assert op["status"] == "completed", op
+    assert "manual_power_on:h2" in op["plan"]["warnings"]
+    assert "h2" not in lab.hosts_up
+
+
+def test_start_waits_for_a_host_powered_on_by_hand(lab, tmp_path):
+    import threading
+
+    lab.can_wake["h2"] = False
+    harness = _manual_harness(lab, tmp_path, {"host_start": 3})
+    harness.run(SHUTDOWN)
+    lab.events.clear()
+    # Someone presses the power button a moment later.
+    threading.Timer(0.3, lambda: lab.hosts_up.add("h2")).start()
+    op = harness.run(START)
+    assert op["status"] == "completed", op
+    assert "wake:h2" not in lab.events and "wake:h1" in lab.events
+
+
+def test_start_times_out_when_nobody_powers_the_host_on(lab, tmp_path):
+    lab.can_wake["h2"] = False
+    harness = _manual_harness(lab, tmp_path, {"host_start": 0.2})
+    harness.run(SHUTDOWN)
+    op = harness.run(START)
+    assert (op["status"], op["error_code"], op["error"]) == ("failed", "host_start_timeout", "h2")
+
+
+def test_manual_power_on_flag_in_the_cli(tmp_path, capsys):
+    from ha_hypervisor_agent import cli
+    from ha_hypervisor_agent.config import load
+
+    path = str(tmp_path / "c.yaml")
+    cli.main(["init", "--config", path])
+    cli.main(["mqtt", "set", "--host", "b", "--no-tls", "--config", path])
+    import io
+    import sys
+
+    sys.stdin = io.StringIO("secret\n")
+    try:
+        assert cli.main(["esxi", "add", "h1", "--username", "root", "--password-stdin",
+                         "--manual-power-on", "--config", path]) == 0
+    finally:
+        sys.stdin = sys.__stdin__
+    assert "a person powers it on" in capsys.readouterr().out
+    assert load(path).hosts[0].manual_power_on is True
+    cli.main(["esxi", "list", "--config", path])
+    assert "manual power on" in capsys.readouterr().out
+    cli.main(["esxi", "add", "h1", "--update", "--no-manual-power-on", "--config", path])
+    assert load(path).hosts[0].manual_power_on is False

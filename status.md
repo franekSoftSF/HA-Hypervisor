@@ -1,6 +1,6 @@
 # Status
 
-Version 0.6.1, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
+Version 0.7.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
@@ -15,6 +15,8 @@ Version 0.6.1, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
   "revert to snapshot before start". Preflight checks every VM first; vCenter and protected VMs are never reverted.
 - Agent on the Proxmox node itself (the user's single node setup): own node last, completed reported first, no remote
   start possible. An agent in a guest of the same node is not supported.
+- Hosts without BMC or Wake on LAN: manual_power_on (CLI --manual-power-on) allows the shutdown, the start waits
+  for the power button. Compact panel layout: overview row, control grid, one VM list running first.
 - Repairs after every start: agent not answering within a minute, agent older than the integration.
 - Tests in Docker on the real Home Assistant 2026.11 image, hassfest, end-to-end stack with `vcsim`.
 
@@ -25,7 +27,8 @@ Version 0.6.1, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
 - MQTT over WebSocket through the real reverse proxy.
 
 ## Next
-1. On the Supermicro: add the BMC to host 172.16.2.20, then a shutdown preview, then a real cycle.
+1. On the Supermicro (no BMC configured): esxi add 172.16.2.20 --update --manual-power-on, then a preview, then a
+   real cycle with the power button.
 2. Proxmox on the real node: proxmox set, node add, node test, then preview, shutdown, start.
 3. Mixed scenarios across DCs, see the plan below.
 4. Possible additions: disk and network statistics through PerformanceManager, BMC sensors (power draw, temperature).

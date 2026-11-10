@@ -5,12 +5,14 @@
 const TEXT = {
   en: {
     title: "Hypervisor",
-    cluster: "Cluster",
+    overview: "Overview",
     control: "Control",
     hosts: "Hosts",
     datastores: "Datastores",
-    running: "Running VMs",
-    stopped: "Stopped VMs",
+    vms: "Virtual machines",
+    vmsCount: (on, total) => `${on} of ${total} running`,
+    cpu: "CPU",
+    memory: "Memory",
     scenarios: "Scenarios",
     offline: "agent offline",
     empty: "No agent is set up yet.",
@@ -19,12 +21,14 @@ const TEXT = {
   },
   pl: {
     title: "Hypervisor",
-    cluster: "Klaster",
+    overview: "Przegląd",
     control: "Sterowanie",
     hosts: "Hosty",
     datastores: "Magazyny danych",
-    running: "Włączone maszyny",
-    stopped: "Wyłączone maszyny",
+    vms: "Maszyny wirtualne",
+    vmsCount: (on, total) => `włączone ${on} z ${total}`,
+    cpu: "CPU",
+    memory: "Pamięć",
     scenarios: "Scenariusze",
     offline: "agent offline",
     empty: "Nie dodano jeszcze żadnego agenta.",
@@ -33,7 +37,7 @@ const TEXT = {
   },
 };
 
-const CLUSTER_KEYS = [
+const OVERVIEW_KEYS = [
   "cluster_state",
   "vcenter_reachable",
   "proxmox_reachable",
@@ -42,7 +46,6 @@ const CLUSTER_KEYS = [
   "hosts_online",
   "vms_running",
   "operation",
-  "operation_step",
 ];
 
 const CONTROL_KEYS = [
@@ -146,12 +149,17 @@ class HaHypervisorPanel extends HTMLElement {
     return this._hass?.states[entityId]?.state === "on";
   }
 
+  // What changes the layout: VMs moving between on and off, an operation
+  // starting or ending (its step is shown only while it runs).
   _vmGrouping() {
     if (!this._layout) return "";
     return this._layout.agents
-      .flatMap((agent) => agent.vms)
-      .map((vm) => (this._isOn(vm.entities.vm_power) ? "1" : "0"))
-      .join("");
+      .map(
+        (agent) =>
+          (this._running(agent) ? "r" : "-") +
+          agent.vms.map((vm) => (this._isOn(vm.entities.vm_power) ? "1" : "0")).join(""),
+      )
+      .join("|");
   }
 
   async _load() {
@@ -213,11 +221,26 @@ class HaHypervisorPanel extends HTMLElement {
           font-size: 13px;
           color: var(--error-color);
         }
-        .grid {
+        .sections {
           display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-          gap: 16px;
+          grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+          gap: 20px 16px;
           align-items: start;
+        }
+        .sections > .full { grid-column: 1 / -1; }
+        .tiles {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(var(--min, 160px), 1fr));
+          gap: 8px;
+          margin-top: 4px;
+        }
+        .tiles.fit { grid-template-columns: repeat(auto-fit, minmax(var(--min, 160px), 1fr)); }
+        .tiles + .tiles { margin-top: 12px; }
+        .tiles + .tiles.tight { margin-top: 8px; }
+        .tiles > .span { grid-column: 1 / -1; }
+        @media (max-width: 600px) {
+          .content { padding: 8px; }
+          .sections { grid-template-columns: 1fr; }
         }
         .message {
           padding: 32px 16px;
@@ -247,54 +270,84 @@ class HaHypervisorPanel extends HTMLElement {
     this._cards = [];
   }
 
+  _running(agent) {
+    const operation = agent.cluster.operation;
+    return operation && this._hass?.states[operation]?.state === "running";
+  }
+
+  // A section is a heading and groups of tiles; each group is a grid whose
+  // columns are at least `min` pixels wide, so it adapts to the screen.
   _sections(agent) {
     const t = this._text;
     const sections = [];
-    const add = (heading, cards, emptyText) => {
-      if (!cards.length && !emptyText) return;
-      sections.push({ heading, cards, emptyText });
+    const add = (heading, groups, options = {}) => {
+      const filled = groups.filter((group) => group.tiles.length);
+      if (filled.length) sections.push({ heading, groups: filled, ...options });
     };
+    const small = (entity, extra = {}) => tile(entity, "entity", { vertical: true, ...extra });
 
-    const cluster = CLUSTER_KEYS.filter((key) => agent.cluster[key]).map((key) =>
-      tile(agent.cluster[key]),
-    );
-    add(t.cluster, cluster);
+    const overview = OVERVIEW_KEYS.filter((key) => agent.cluster[key]).map((key) => small(agent.cluster[key]));
+    if (this._running(agent) && agent.cluster.operation_step) {
+      overview.push(small(agent.cluster.operation_step));
+    }
+    add(t.overview, [{ min: 150, tiles: overview }], { full: true });
 
     const control = CONTROL_KEYS.filter((key) => agent.cluster[key]).map((key) => {
       const entity = agent.cluster[key];
-      if (key === "shutdown_armed") return tile(entity);
-      return press(entity, key === "cluster_shutdown" ? t.confirm : null);
+      if (key === "shutdown_armed") return small(entity);
+      return { ...press(entity, key === "cluster_shutdown" ? t.confirm : null), vertical: true };
     });
-    add(t.control, control);
+    add(t.control, [{ min: 170, tiles: control }]);
 
-    const hosts = agent.hosts.flatMap((host) =>
-      [
-        host.entities.host_power && tile(host.entities.host_power, "device"),
-        // Full names, with several hosts "CPU usage" alone is ambiguous.
-        host.entities.host_cpu_percent && { type: "tile", entity: host.entities.host_cpu_percent },
-        host.entities.host_memory_percent && { type: "tile", entity: host.entities.host_memory_percent },
-      ].filter(Boolean),
-    );
+    // Each host: its state on one row, CPU and memory sharing the next one.
+    const hosts = agent.hosts.flatMap((host) => [
+      { min: 200, tiles: [host.entities.host_power && tile(host.entities.host_power, "device")].filter(Boolean) },
+      {
+        min: 110,
+        fit: true,
+        tight: true,
+        tiles: [
+        host.entities.host_cpu_percent && tile(host.entities.host_cpu_percent, "entity", { name: t.cpu }),
+        host.entities.host_memory_percent &&
+          tile(host.entities.host_memory_percent, "entity", { name: t.memory }),
+        ].filter(Boolean),
+      },
+    ]);
     add(t.hosts, hosts);
 
-    const vms = agent.vms.filter((vm) => vm.entities.vm_power);
-    const vmTile = (vm) => tile(vm.entities.vm_power, "device", { features_position: "inline" });
-    add(t.running, vms.filter((vm) => this._isOn(vm.entities.vm_power)).map(vmTile), t.none);
-    add(t.stopped, vms.filter((vm) => !this._isOn(vm.entities.vm_power)).map(vmTile), t.none);
-
-    const scenarios = agent.scenarios.flatMap((scenario) =>
-      [
-        scenario.entities.scenario_state && tile(scenario.entities.scenario_state, "device"),
+    const scenarios = agent.scenarios.flatMap((scenario) => [
+      {
+        min: 200,
+        tiles: [
+          scenario.entities.scenario_state && tile(scenario.entities.scenario_state, "device"),
+        ].filter(Boolean),
+      },
+      {
+        min: 110,
+        fit: true,
+        tight: true,
+        tiles: [
         scenario.entities.scenario_start && press(scenario.entities.scenario_start),
         scenario.entities.scenario_stop && press(scenario.entities.scenario_stop),
-      ].filter(Boolean),
-    );
+        ].filter(Boolean),
+      },
+    ]);
     add(t.scenarios, scenarios);
 
     const datastores = agent.datastores
       .filter((store) => store.entities.datastore_used_percent)
       .map((store) => tile(store.entities.datastore_used_percent, "device"));
-    add(t.datastores, datastores);
+    add(t.datastores, [{ min: 150, tiles: datastores }]);
+
+    // One list, running first, so a long list stays easy to scan.
+    const vms = agent.vms.filter((vm) => vm.entities.vm_power);
+    const on = vms.filter((vm) => this._isOn(vm.entities.vm_power));
+    const off = vms.filter((vm) => !this._isOn(vm.entities.vm_power));
+    add(
+      `${t.vms} · ${t.vmsCount(on.length, vms.length)}`,
+      [{ min: 200, tiles: [...on, ...off].map((vm) => tile(vm.entities.vm_power, "device")) }],
+      { full: true },
+    );
     return sections;
   }
 
@@ -326,20 +379,30 @@ class HaHypervisorPanel extends HTMLElement {
         block.appendChild(title);
       }
       const grid = document.createElement("div");
-      grid.className = "grid";
+      grid.className = "sections";
       for (const section of this._sections(agent)) {
-        const stack = {
-          type: "vertical-stack",
-          cards: [
-            { type: "heading", heading: section.heading },
-            section.cards.length
-              ? { type: "grid", columns: 1, square: false, cards: section.cards }
-              : { type: "markdown", content: section.emptyText },
-          ],
-        };
-        const card = this._createCard(helpers, stack);
-        grid.appendChild(card);
-        cards.push(card);
+        const box = document.createElement("section");
+        if (section.full) box.className = "full";
+        const heading = this._createCard(helpers, { type: "heading", heading: section.heading });
+        box.appendChild(heading);
+        cards.push(heading);
+        for (const group of section.groups) {
+          const tiles = document.createElement("div");
+          tiles.className = "tiles";
+          tiles.style.setProperty("--min", `${group.min}px`);
+          // fit: few tiles share the whole width instead of leaving gaps.
+          if (group.fit) tiles.classList.add("fit");
+          if (group.tight) tiles.classList.add("tight");
+          for (const config of group.tiles) {
+            const { grid: span, ...cardConfig } = config;
+            const card = this._createCard(helpers, cardConfig);
+            if (span === "full") card.classList.add("span");
+            tiles.appendChild(card);
+            cards.push(card);
+          }
+          box.appendChild(tiles);
+        }
+        grid.appendChild(box);
       }
       block.appendChild(grid);
       fragment.appendChild(block);

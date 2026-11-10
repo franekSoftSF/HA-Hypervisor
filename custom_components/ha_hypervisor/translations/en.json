@@ -218,7 +218,7 @@
     "agent_host_not_configured": { "message": "A host is missing from the agent configuration." },
     "agent_host_stop_timeout": { "message": "A host did not shut down in time." },
     "agent_host_start_timeout": { "message": "A host did not start in time." },
-    "agent_no_wake_method": { "message": "A host could not be started again, so the shutdown was refused." },
+    "agent_no_wake_method": { "message": "A host could not be started again, so the shutdown was refused. Add its BMC or Wake on LAN, or allow powering it on by hand: esxi add (or node add) NAME --update --manual-power-on." },
     "agent_wake_failed": { "message": "A host could not be powered on." },
     "agent_protected_vm_running": { "message": "A protected VM is running." },
     "agent_vm_protected": { "message": "This VM is protected." },
