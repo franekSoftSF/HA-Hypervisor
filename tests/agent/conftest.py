@@ -56,6 +56,8 @@ class Vm:
     power: str = "off"
     tools: bool = True
     ignores_shutdown: bool = False
+    # name -> power state saved with it (memory snapshot when "on")
+    snapshots: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -134,6 +136,7 @@ class FakeClient:
                 "ip": None,
                 "guest_os": None,
                 "uptime_s": 0,
+                "snapshots": list(vm.snapshots),
             }
             for vm in self.lab.vms.values()
             if self.host is None or vm.host == self.host
@@ -162,6 +165,25 @@ class FakeClient:
         self.lab.events.append(f"guest:{vm_id}:{self.via}")
         if not vm.ignores_shutdown:
             vm.power = "off"
+
+    def snapshots(self, vm_id: str) -> list[str]:
+        return list(self._vm(vm_id).snapshots)
+
+    def create_snapshot(self, vm_id: str, name: str, description: str = "", memory: bool = False) -> None:
+        vm = self._vm(vm_id)
+        vm.snapshots[name] = "on" if memory and vm.power == "on" else "off"
+        self.lab.events.append(f"snapshot:{vm_id}:{name}:{memory}")
+
+    def revert_snapshot(self, vm_id: str, name: str) -> None:
+        vm = self._vm(vm_id)
+        if name not in vm.snapshots:
+            raise VimNotFound(name)
+        vm.power = vm.snapshots[name]
+        self.lab.events.append(f"revert:{vm_id}:{name}")
+
+    def delete_snapshot(self, vm_id: str, name: str) -> None:
+        del self._vm(vm_id).snapshots[name]
+        self.lab.events.append(f"delsnapshot:{vm_id}:{name}")
 
     def shutdown_host(self) -> None:
         assert self.host is not None

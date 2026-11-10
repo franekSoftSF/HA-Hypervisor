@@ -87,6 +87,29 @@ def call(domain: str, service: str, **data: Any) -> Any:
     return api("POST", f"/api/services/{domain}/{service}", json=data)
 
 
+def last_op(prefix: str) -> dict[str, Any]:
+    return states()[f"sensor.{prefix}_operation"]
+
+
+def run_op(prefix: str, service: str, timeout: float = 60, **data: Any) -> dict[str, Any]:
+    """Call an action that starts an operation and wait until it completed."""
+    def mark() -> tuple:
+        attributes = last_op(prefix)["attributes"]
+        return attributes.get("kind"), attributes.get("started")
+
+    before = mark()
+    call("ha_hypervisor", service, **data)
+    wait(
+        f"{service} finished",
+        lambda: mark() != before
+        and last_op(prefix)["state"] in ("completed", "failed"),
+        timeout,
+    )
+    operation = last_op(prefix)
+    assert operation["state"] == "completed", operation
+    return operation
+
+
 def main() -> None:
     onboard()
 
@@ -220,6 +243,24 @@ def main() -> None:
     call("button", "press", entity_id="button.test_stop")
     wait("all VMs off", lambda: all(state(s) == "off" for s in switches), 60)
     wait("scenario inactive", lambda: state("sensor.test_state") == "inactive", 30)
+
+    step("snapshots through Home Assistant, real vSphere calls on vcsim")
+    vm_switch = switches[0]
+    snapshots = vm_switch.replace("switch.", "sensor.").replace("_power", "_snapshots")
+    run_op("hypervisor_e2e", "create_snapshot", entity_id=vm_switch, name="E2E", memory=False)
+    wait("snapshot listed", lambda: state(snapshots) == "1", 30)
+    assert states()[snapshots]["attributes"]["snapshots"] == ["E2E"]
+    run_op("hypervisor_e2e", "revert_snapshot", entity_id=vm_switch, name="E2E", start=True)
+    wait(f"{vm_switch} on after revert", lambda: state(vm_switch) == "on", 30)
+    refused = session.post(
+        f"{BASE}/api/services/ha_hypervisor/create_snapshot",
+        json={"entity_id": vm_switch, "name": "E2E"},
+        timeout=30,
+    )
+    assert refused.status_code == 200, refused.text  # accepted, refused by the agent preflight
+    wait("duplicate refused", lambda: last_op("hypervisor_e2e")["attributes"].get("error_code") == "snapshot_exists", 30)
+    run_op("hypervisor_e2e", "delete_snapshot", entity_id=vm_switch, name="E2E")
+    wait("snapshot gone", lambda: state(snapshots) == "0", 30)
 
     step("action without confirm is refused")
     response = session.post(

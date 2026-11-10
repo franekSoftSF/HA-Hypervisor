@@ -31,7 +31,7 @@ Wymaga Home Assistant 2026.11 lub nowszego oraz integracji MQTT.
 |---|---|
 | Agent / klaster | stan klastra, użycie CPU i pamięci, hosty online, działające maszyny, operacja i jej krok, przyciski: podgląd wyłączenia, wyłącz, uruchom, anuluj, odśwież, przełącznik odbezpieczenia |
 | Host | CPU, pamięć, czas działania, zasilanie, połączenie |
-| Maszyna | przełącznik zasilania (wyłączenie przez system gościa), wymuszone wyłączenie, CPU, pamięć, dysk, IP, host, VMware Tools |
+| Maszyna | przełącznik zasilania (wyłączenie przez system gościa), wymuszone wyłączenie, CPU, pamięć, dysk, IP, host, narzędzia gościa, migawki |
 | Datastore | zajęte %, wolne, pojemność |
 | Scenariusz | uruchom, zatrzymaj, stan |
 

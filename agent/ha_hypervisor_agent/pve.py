@@ -8,6 +8,7 @@ whole cluster, a call about another node is forwarded by Proxmox itself.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 from urllib.parse import quote
 
@@ -28,6 +29,8 @@ _LOGGER = logging.getLogger(__name__)
 _MB = 1024 * 1024
 _GB = 1024 * 1024 * 1024
 _TIMEOUT = 10
+_SNAPSHOT_TIMEOUT = 3600
+_TASK_POLL = 1.0
 _AGENT_TIMEOUT = 4
 
 GUEST_TYPES = ("qemu", "lxc")
@@ -251,6 +254,62 @@ class ProxmoxClient:
         """Shut a node down. Call it on the node itself."""
         self._request("POST", f"/nodes/{quote(node)}/status", command="shutdown")
 
+    # -------------------------------------------------------------- snapshots
+
+    def list_snapshots(self, node: str, kind: str, vmid: int) -> list[str]:
+        """Return the snapshot names of a guest, oldest first."""
+        try:
+            items = self._request("GET", f"/nodes/{quote(node)}/{kind}/{vmid}/snapshot") or []
+        except (PlatformError, PlatformUnavailable, GuestNotFound) as err:
+            _LOGGER.debug("Snapshots of %s-%s: %s", kind, vmid, err)
+            return []
+        # "current" is the running state, not a snapshot.
+        found = [item for item in items if item.get("name") != "current"]
+        found.sort(key=lambda item: _int(item.get("snaptime")))
+        return [str(item["name"]) for item in found]
+
+    def wait_task(self, upid: Any, timeout: float = _SNAPSHOT_TIMEOUT) -> None:
+        """Wait for a Proxmox task, raising PlatformError when it fails."""
+        if not isinstance(upid, str) or not upid.startswith("UPID:"):
+            return  # nothing to wait for
+        node = upid.split(":")[1]
+        deadline = time.monotonic() + timeout
+        while True:
+            status = self._request("GET", f"/nodes/{quote(node)}/tasks/{quote(upid)}/status") or {}
+            if status.get("status") == "stopped":
+                if status.get("exitstatus") != "OK":
+                    raise PlatformError(f"task failed: {status.get('exitstatus')}")
+                return
+            if time.monotonic() >= deadline:
+                raise PlatformError("task timed out")
+            time.sleep(_TASK_POLL)
+
+    def snapshots(self, vm_id: str) -> list[str]:
+        """Return the snapshot names of a guest, read now."""
+        path, kind, vmid = self._guest_path(vm_id)
+        node = path.split("/")[2]
+        return self.list_snapshots(node, kind, vmid)
+
+    def create_snapshot(
+        self, vm_id: str, name: str, description: str = "", memory: bool = False
+    ) -> None:
+        """Take a snapshot and wait for it. Memory (vmstate) exists for QEMU only."""
+        kind, _ = split_guest_id(vm_id)
+        params: dict[str, Any] = {"snapname": name, "description": description}
+        if memory and kind == "qemu":
+            params["vmstate"] = 1
+        self.wait_task(self._guest_request(vm_id, "POST", "snapshot", **params))
+
+    def revert_snapshot(self, vm_id: str, name: str) -> None:
+        """Go back to a snapshot. A running guest is stopped first, its state is lost anyway."""
+        if self.vm_status(vm_id)["power"] == "on":
+            self.wait_task(self._guest_request(vm_id, "POST", "status/stop"), _TIMEOUT * 12)
+        self.wait_task(self._guest_request(vm_id, "POST", f"snapshot/{quote(name)}/rollback"))
+
+    def delete_snapshot(self, vm_id: str, name: str) -> None:
+        """Remove a snapshot."""
+        self.wait_task(self._guest_request(vm_id, "DELETE", f"snapshot/{quote(name)}"))
+
 
 class PveInfra:
     """Hands out node clients and the host power chains."""
@@ -385,6 +444,9 @@ def build_pve_view(config: AgentConfig, infra: PveInfra) -> View:
         tools, address = (False, None)
         if running:
             tools, address = client.guest_ips(node, kind, vmid)
+        snapshots: list[str] = []
+        if view.hosts.get(node, {}).get("connected"):
+            snapshots = client.list_snapshots(node, kind, vmid)
         cpus = _int(item.get("maxcpu"))
         view.vms[vm_id] = {
             "id": vm_id,
@@ -403,6 +465,7 @@ def build_pve_view(config: AgentConfig, infra: PveInfra) -> View:
             "guest_os": "LXC container" if kind == "lxc" else "QEMU virtual machine",
             "uptime_s": _int(item.get("uptime")),
             "ha": ha.get(ha_sid(kind, vmid)),
+            "snapshots": snapshots,
         }
         view.clients[vm_id] = client  # type: ignore[assignment]
     client.remember_nodes(placement)

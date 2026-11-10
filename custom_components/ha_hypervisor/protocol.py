@@ -49,6 +49,12 @@ CMD_CLUSTER_SHUTDOWN = "cluster_shutdown"
 CMD_CLUSTER_START = "cluster_start"
 CMD_SCENARIO_START = "scenario_start"
 CMD_SCENARIO_STOP = "scenario_stop"
+CMD_SNAPSHOT_CREATE = "snapshot_create"
+CMD_SNAPSHOT_REVERT = "snapshot_revert"
+CMD_SNAPSHOT_DELETE = "snapshot_delete"
+SNAPSHOT_COMMANDS = (CMD_SNAPSHOT_CREATE, CMD_SNAPSHOT_REVERT, CMD_SNAPSHOT_DELETE)
+# Proxmox rules, used on both platforms so a scenario works on either.
+SNAPSHOT_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{1,39}$")
 
 VM_ACTION_ON = "on"
 VM_ACTION_SHUTDOWN = "shutdown"
@@ -89,6 +95,9 @@ STEPS = (
     "stop_empty_hosts",
     "wait_quorum",
     "restore_ha",
+    "snapshot_create",
+    "snapshot_revert",
+    "snapshot_delete",
 )
 
 # Language-neutral error codes, translated in Home Assistant.
@@ -121,6 +130,8 @@ ERROR_CODES = (
     "proxmox_unavailable",
     "proxmox_error",
     "quorum_timeout",
+    "snapshot_not_found",
+    "snapshot_exists",
 )
 
 _AGENT_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")

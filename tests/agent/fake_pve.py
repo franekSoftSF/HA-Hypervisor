@@ -35,6 +35,8 @@ class Guest:
     ignores_shutdown: bool = False
     template: bool = False
     ha: str | None = None  # HA requested state: started, stopped, ...
+    # name -> {"vmstate": bool, "running": bool}, oldest first.
+    snapshots: dict[str, dict[str, bool]] = field(default_factory=dict)
 
     @property
     def sid(self) -> str:
@@ -199,6 +201,9 @@ class _Handler(BaseHTTPRequestHandler):
     def do_PUT(self) -> None:  # noqa: N802
         self._handle("PUT")
 
+    def do_DELETE(self) -> None:  # noqa: N802
+        self._handle("DELETE")
+
 
 def _guest(cluster: Cluster, node: str, kind: str, vmid: str) -> Guest:
     guest = cluster.guests.get(int(vmid))
@@ -214,6 +219,61 @@ def _reach(cluster: Cluster, node: str) -> None:
         raise ApiError(500, f"hostname lookup '{node}' failed - does not exist")
     if not target.online:
         raise ApiError(595, f"No route to host {node}")
+
+
+def _snapshot(  # noqa: PLR0913
+    cluster: Cluster,
+    method: str,
+    params: dict[str, str],
+    node: str,
+    kind: str,
+    vmid: str,
+    name: str | None,
+    rollback: str | None,
+) -> Any:
+    _reach(cluster, node)
+    guest = _guest(cluster, node, kind, vmid)
+    upid = f"UPID:{node}:0000:0000:0000:snapshot:{vmid}:{TOKEN}:"
+    if name is None:
+        if method == "GET":
+            return [
+                {"name": snap, "snaptime": 1700000000 + index, "vmstate": int(data["vmstate"]),
+                 "description": ""}
+                for index, (snap, data) in enumerate(guest.snapshots.items())
+            ] + [{"name": "current", "digest": "x", "running": int(guest.running)}]
+        if method != "POST":
+            raise ApiError(501, "not implemented")
+        _need_quorum(cluster)
+        snapname = params.get("snapname", "")
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{1,39}", snapname):
+            raise ApiError(400, "snapname: invalid format")
+        if snapname in guest.snapshots:
+            raise ApiError(500, f"snapshot name '{snapname}' already used")
+        vmstate = params.get("vmstate") == "1"
+        if vmstate and kind != "qemu":
+            raise ApiError(400, "vmstate: property is not defined in schema")
+        guest.snapshots[snapname] = {"vmstate": vmstate and guest.running, "running": guest.running}
+        cluster.events.append(f"snapshot:{guest.name}:{snapname}")
+        return upid
+    if name not in guest.snapshots:
+        raise ApiError(500, f"snapshot '{name}' does not exist")
+    _need_quorum(cluster)
+    if rollback:
+        if method != "POST":
+            raise ApiError(501, "not implemented")
+        if guest.running and kind == "lxc":
+            raise ApiError(500, "CT is running")
+        if guest.running:
+            # qm rollback stops a running VM itself.
+            guest.running = False
+        guest.running = guest.snapshots[name]["vmstate"]
+        cluster.events.append(f"rollback:{guest.name}:{name}")
+        return upid
+    if method == "DELETE":
+        del guest.snapshots[name]
+        cluster.events.append(f"delsnapshot:{guest.name}:{name}")
+        return upid
+    raise ApiError(501, "not implemented")
 
 
 def _need_quorum(cluster: Cluster) -> None:
@@ -364,6 +424,16 @@ def route(cluster: Cluster, here: str, method: str, path: str, params: dict[str,
             "uptime": 3600,
             "memory": {"total": 32 * GIB, "used": 8 * GIB},
         }
+
+    match = re.fullmatch(r"/nodes/([^/]+)/tasks/([^/]+)/status", path)
+    if match:
+        _reach(cluster, match.group(1))
+        # Every task of the simulator finishes at once.
+        return {"status": "stopped", "exitstatus": "OK", "upid": match.group(2)}
+
+    match = re.fullmatch(r"/nodes/([^/]+)/(qemu|lxc)/(\d+)/snapshot(?:/([^/]+)(/rollback)?)?", path)
+    if match:
+        return _snapshot(cluster, method, params, *match.groups())
 
     match = re.fullmatch(r"/nodes/([^/]+)/lxc/(\d+)/interfaces", path)
     if match:

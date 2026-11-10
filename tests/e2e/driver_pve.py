@@ -4,7 +4,7 @@ from __future__ import annotations
 
 # The driver runs as __main__: its logged-in session lives there, not in a
 # second copy imported as "driver".
-from __main__ import api, call, flow, state, states, step, wait  # type: ignore[attr-defined]
+from __main__ import api, call, flow, run_op, state, states, step, wait  # type: ignore[attr-defined]
 
 AGENT = "e2epve"
 KEY = "e2e-proxmox-key-e2e-proxmox-key-e2e-proxmox"
@@ -99,3 +99,14 @@ def proxmox() -> None:
     assert state("switch.ad01_power") == "on" and state("switch.pihole_power") == "on"
     assert state("switch.files01_power") == "off"
 
+
+    step("Proxmox snapshots: create, change, revert")
+    targets = ["switch.ad01_power", "switch.pihole_power"]
+    run_op(PREFIX, "create_snapshot", entity_id=targets, name="Clean", memory=True)
+    wait("snapshots listed", lambda: state("sensor.ad01_snapshots") == "1" and state("sensor.pihole_snapshots") == "1", 30)
+    call("switch", "turn_off", entity_id="switch.pihole_power")
+    wait("pihole off", lambda: state("switch.pihole_power") == "off", 30)
+    run_op(PREFIX, "revert_snapshot", entity_id=targets, name="Clean", start=True)
+    wait("both running after revert", lambda: all(state(t) == "on" for t in targets), 30)
+    run_op(PREFIX, "delete_snapshot", entity_id=targets, name="Clean")
+    wait("snapshots gone", lambda: state("sensor.ad01_snapshots") == "0", 30)

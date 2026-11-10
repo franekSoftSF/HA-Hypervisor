@@ -43,3 +43,47 @@ shutdown_cluster:
       selector:
         config_entry:
           integration: ha_hypervisor
+
+create_snapshot:
+  target:
+    entity:
+      integration: ha_hypervisor
+  fields:
+    name:
+      required: true
+      example: "Demo"
+      selector:
+        text:
+    description:
+      selector:
+        text:
+    memory:
+      default: false
+      selector:
+        boolean:
+
+revert_snapshot:
+  target:
+    entity:
+      integration: ha_hypervisor
+  fields:
+    name:
+      required: true
+      example: "Demo"
+      selector:
+        text:
+    start:
+      default: false
+      selector:
+        boolean:
+
+delete_snapshot:
+  target:
+    entity:
+      integration: ha_hypervisor
+  fields:
+    name:
+      required: true
+      example: "Demo"
+      selector:
+        text:

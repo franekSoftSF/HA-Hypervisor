@@ -110,6 +110,7 @@ Utwórz rolę i przypisz ją kontu agenta na poziomie głównym vCenter, z propa
 | Virtual machine, Interaction, Power on | Uruchamianie maszyn |
 | Virtual machine, Interaction, Power off | Wyłączanie maszyn, także przez system gościa |
 | Global, Settings | Tryb Retreat vCLS |
+| Virtual machine, Snapshot management, Create, Revert, Remove | Akcje migawek i scenariusze przywracające migawkę |
 
 ### ESXi
 
@@ -139,7 +140,7 @@ się kończy z opcją wyłączania pustych hostów, agent zostawia włączone ty
 Utwórz użytkownika, rolę i token na dowolnym węźle (w klastrze raz, są wspólne):
 
 ```bash
-pveum role add HAHypervisor -privs "VM.Audit VM.PowerMgmt VM.GuestAgent.Audit Sys.Audit Sys.PowerMgmt Sys.Console Datastore.Audit"
+pveum role add HAHypervisor -privs "VM.Audit VM.PowerMgmt VM.Snapshot VM.Snapshot.Rollback VM.GuestAgent.Audit Sys.Audit Sys.PowerMgmt Sys.Console Datastore.Audit"
 ```
 
 ```bash
@@ -181,7 +182,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.5.1
+VERSION=0.6.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -384,6 +385,31 @@ Tak samo działa wtyczka Home Assistant w Stream Decku lub Macro Decku: wybierz 
 przycisk pokaże też stan maszyny. Scenariusze i klaster działają tak samo przez swoje przyciski (`button.press`) albo akcje
 `ha_hypervisor.start_scenario` i `ha_hypervisor.stop_scenario`. Wyłączenie klastra zawsze wymaga najpierw przełącznika
 odbezpieczenia, także z panelu przycisków.
+
+### Migawki, np. laboratorium pokazowe wracające do czystego stanu
+
+Trzy akcje działają na maszynach obu platform, wybieranych przez urządzenie albo dowolną ich encję, także maszynach dwóch
+agentów naraz: **Utwórz migawkę** (`ha_hypervisor.create_snapshot`), **Przywróć migawkę** i **Usuń migawkę**. Każda
+maszyna ma czujnik **Migawki** z nazwami w atrybucie.
+
+- Przywrócenie jest sprawdzane na każdej wybranej maszynie, zanim którakolwiek zostanie przywrócona: migawka musi istnieć
+  wszędzie, vCenter i maszyny chronione są odrzucane. Obecny stan maszyny przepada, o to chodzi.
+- **Z pamięcią** wraca do działającej maszyny; bez tego maszyna jest po przywróceniu wyłączona, a **Uruchom potem** ją
+  włącza. Kontenery Proxmox zawsze dostają migawkę dysku.
+- Scenariusz może **przywrócić migawkę przed startem**: każda jego maszyna najpierw do niej wraca, potem grupy startują
+  jak zwykle.
+
+```yaml
+# Po pokazie: przywróć laboratorium dla następnego
+action: ha_hypervisor.revert_snapshot
+target:
+  entity_id: [switch.web01_power, switch.db01_power]
+data:
+  name: Clean
+  start: false
+```
+
+Nazwy: od 2 do 40 liter, cyfr, `-` i `_`, zaczynając od litery (reguła Proxmox, stosowana na obu platformach).
 
 ### Sprawdzenie agenta po aktualizacji
 

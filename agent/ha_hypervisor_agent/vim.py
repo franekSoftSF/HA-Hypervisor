@@ -27,6 +27,8 @@ _MB = 1024 * 1024
 _GB = 1024 * 1024 * 1024
 _AUTH_BACKOFF = 120
 _TASK_TIMEOUT = 120
+# Consolidating a large disk or saving memory takes long.
+_SNAPSHOT_TIMEOUT = 3600
 _NETWORK_ERRORS = (OSError, http.client.HTTPException)
 
 _VM_PATHS = [
@@ -44,6 +46,8 @@ _VM_PATHS = [
     "summary.guest.toolsRunningStatus",
     "summary.guest.ipAddress",
     "summary.storage.committed",
+    # Absent when the VM has no snapshot.
+    "snapshot.rootSnapshotList",
 ]
 _HOST_PATHS = [
     "name",
@@ -85,6 +89,19 @@ def _power(state: Any) -> str:
 
 def _int(value: Any) -> int:
     return int(value) if value is not None else 0
+
+
+def _snapshot_tree(nodes: Any) -> list[Any]:
+    """Return every snapshot of a tree, parents before children."""
+    found = []
+    for node in nodes or []:
+        found.append(node)
+        found.extend(_snapshot_tree(node.childSnapshotList))
+    return found
+
+
+def _snapshot_names(nodes: Any) -> list[str]:
+    return [node.name for node in _snapshot_tree(nodes)]
 
 
 class VimClient:
@@ -228,6 +245,7 @@ class VimClient:
                     "ip": data.get("summary.guest.ipAddress"),
                     "guest_os": data.get("summary.config.guestFullName"),
                     "uptime_s": _int(data.get("summary.quickStats.uptimeSeconds")),
+                    "snapshots": _snapshot_names(data.get("snapshot.rootSnapshotList")),
                 }
             )
 
@@ -260,8 +278,8 @@ class VimClient:
             raise VimNotFound(vm_id)
         return vm
 
-    def _wait_task(self, task: Any) -> None:
-        deadline = time.monotonic() + _TASK_TIMEOUT
+    def _wait_task(self, task: Any, timeout: float = _TASK_TIMEOUT) -> None:
+        deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             state = str(task.info.state)
             if state == "success":
@@ -326,6 +344,84 @@ class VimClient:
     def shutdown_guest(self, vm_id: str) -> None:
         """Ask the guest to shut down. This returns before the guest is off."""
         self._call(vm_id, "shutdown")
+
+    # -------------------------------------------------------------- snapshots
+
+    def _snapshot_nodes(self, vm_id: str) -> list[Any]:
+        vm = self._vm(vm_id)
+        try:
+            spec = _PC.FilterSpec(
+                objectSet=[_PC.ObjectSpec(obj=vm, skip=False)],
+                propSet=[
+                    _PC.PropertySpec(
+                        type=vim.VirtualMachine,
+                        pathSet=["snapshot.rootSnapshotList"],
+                        all=False,
+                    )
+                ],
+            )
+            result = self._content.propertyCollector.RetrievePropertiesEx(
+                [spec], _PC.RetrieveOptions()
+            )
+        except vmodl.MethodFault as err:
+            raise VimError(str(err.msg)) from err
+        except _NETWORK_ERRORS as err:
+            raise VimUnavailable(str(err)) from err
+        if result is None or not result.objects:
+            return []
+        values = {prop.name: prop.val for prop in result.objects[0].propSet}
+        return _snapshot_tree(values.get("snapshot.rootSnapshotList"))
+
+    def snapshots(self, vm_id: str) -> list[str]:
+        """Return the snapshot names of a VM, read now."""
+        return [node.name for node in self._snapshot_nodes(vm_id)]
+
+    def _snapshot(self, vm_id: str, name: str) -> Any:
+        matches = [node for node in self._snapshot_nodes(vm_id) if node.name == name]
+        if not matches:
+            raise GuestNotFound(f"snapshot {name}")
+        # Names are kept unique by the agent; if the user made two by hand,
+        # the newest one is meant.
+        return matches[-1].snapshot
+
+    def create_snapshot(
+        self, vm_id: str, name: str, description: str = "", memory: bool = False
+    ) -> None:
+        """Take a snapshot and wait for it. Memory only for a running VM."""
+        vm = self._vm(vm_id)
+        try:
+            self._wait_task(
+                vm.CreateSnapshot_Task(
+                    name=name, description=description, memory=memory, quiesce=False
+                ),
+                _SNAPSHOT_TIMEOUT,
+            )
+        except vmodl.MethodFault as err:
+            raise VimError(str(err.msg)) from err
+        except _NETWORK_ERRORS as err:
+            raise VimUnavailable(str(err)) from err
+
+    def revert_snapshot(self, vm_id: str, name: str) -> None:
+        """Go back to a snapshot. The current state of the VM is lost."""
+        snapshot = self._snapshot(vm_id, name)
+        try:
+            self._wait_task(snapshot.RevertToSnapshot_Task(), _SNAPSHOT_TIMEOUT)
+        except vmodl.MethodFault as err:
+            raise VimError(str(err.msg)) from err
+        except _NETWORK_ERRORS as err:
+            raise VimUnavailable(str(err)) from err
+
+    def delete_snapshot(self, vm_id: str, name: str) -> None:
+        """Remove a snapshot, its children stay."""
+        snapshot = self._snapshot(vm_id, name)
+        try:
+            self._wait_task(
+                snapshot.RemoveSnapshot_Task(removeChildren=False), _SNAPSHOT_TIMEOUT
+            )
+        except vmodl.MethodFault as err:
+            raise VimError(str(err.msg)) from err
+        except _NETWORK_ERRORS as err:
+            raise VimUnavailable(str(err)) from err
 
     def shutdown_host(self) -> None:
         """Shut down the host of a direct ESXi session."""

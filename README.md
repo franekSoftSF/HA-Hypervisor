@@ -32,7 +32,7 @@ Requires Home Assistant 2026.11 or newer with the MQTT integration.
 |---|---|
 | Agent / cluster | cluster state, CPU and memory usage, hosts online, VMs running, operation and step, buttons: preview shutdown, shut down, start, cancel, refresh, arm switch |
 | Host | CPU, memory, uptime, power state, connection |
-| VM | power switch (guest shutdown), force power off, CPU, memory, storage, IP, host, VMware Tools |
+| VM | power switch (guest shutdown), force power off, CPU, memory, storage, IP, host, guest tools, snapshots |
 | Datastore | used %, free, capacity |
 | Scenario | start, stop, state |
 

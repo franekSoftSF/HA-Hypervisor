@@ -18,7 +18,12 @@ from .protocol import (
     CMD_CLUSTER_START,
     CMD_SCENARIO_START,
     CMD_SCENARIO_STOP,
+    CMD_SNAPSHOT_CREATE,
+    CMD_SNAPSHOT_DELETE,
+    CMD_SNAPSHOT_REVERT,
     OP_CANCELLED,
+    SNAPSHOT_COMMANDS,
+    SNAPSHOT_NAME,
     OP_COMPLETED,
     OP_FAILED,
     OP_RUNNING,
@@ -30,6 +35,7 @@ from .protocol import (
     WAIT_POWER,
 )
 from .store import Store
+from .errors import GuestNotFound
 from .vim import (
     Infra,
     VimClient,
@@ -91,11 +97,38 @@ def validate_scenario(scenario: Any) -> dict[str, Any]:
             clean.append({"vms": vms, "wait": wait, "delay": delay, "timeout": timeout})
     except (KeyError, TypeError, ValueError) as err:
         raise OperationFailed("invalid_request", str(err)) from err
+    snapshot = scenario.get("snapshot") or None
+    if snapshot is not None and not (isinstance(snapshot, str) and SNAPSHOT_NAME.match(snapshot)):
+        raise OperationFailed("invalid_request", "snapshot name")
     return {
         "id": scenario_id,
         "name": name,
         "steps": clean,
         "power_off_empty_hosts": bool(scenario.get("power_off_empty_hosts", False)),
+        "snapshot": snapshot,
+    }
+
+
+def validate_snapshot(body: Any) -> dict[str, Any]:
+    """Check a snapshot command received from Home Assistant."""
+    try:
+        vms = body["vms"]
+        name = body["name"]
+        description = str(body.get("description") or "")[:200]
+        if not (isinstance(vms, list) and vms and all(isinstance(vm, str) for vm in vms)):
+            raise TypeError("vms must be a non-empty list")  # noqa: TRY301
+        if not (isinstance(name, str) and SNAPSHOT_NAME.match(name)):
+            raise TypeError(  # noqa: TRY301
+                "name: 2 to 40 letters, digits, - and _, starting with a letter"
+            )
+    except (KeyError, TypeError) as err:
+        raise OperationFailed("invalid_request", str(err)) from err
+    return {
+        "vms": list(dict.fromkeys(vms)),
+        "name": name,
+        "description": description,
+        "memory": bool(body.get("memory", False)),
+        "start": bool(body.get("start", False)),
     }
 
 
@@ -146,9 +179,14 @@ class Orchestrator:
             CMD_CLUSTER_START: self._cluster_start,
             CMD_SCENARIO_START: self._scenario_start,
             CMD_SCENARIO_STOP: self._scenario_stop,
+            CMD_SNAPSHOT_CREATE: self._snapshot_create,
+            CMD_SNAPSHOT_REVERT: self._snapshot_revert,
+            CMD_SNAPSHOT_DELETE: self._snapshot_delete,
         }
         if kind in (CMD_SCENARIO_START, CMD_SCENARIO_STOP):
             body = {**body, "scenario": validate_scenario(body.get("scenario"))}
+        if kind in SNAPSHOT_COMMANDS:
+            body = validate_snapshot(body)
 
         with self._lock:
             if self.busy:
@@ -568,9 +606,20 @@ class Orchestrator:
             names = [known.get(vm, {}).get("name", vm) for vm in missing]
             raise OperationFailed("vm_not_found", ", ".join(names))
 
+        if scenario["snapshot"]:
+            # Checked for every VM before the first one is touched.
+            targets = [view.vms[vm] for vm in dict.fromkeys(wanted)]
+            self._check_revert(view, targets, scenario["snapshot"])
+
         active = self._store.get("active_scenarios")
         active[scenario["id"]] = {"name": scenario["name"], "vms": wanted}
         self._store.set("active_scenarios", active)
+
+        if scenario["snapshot"]:
+            self._step("snapshot_revert", scenario["snapshot"])
+            for vm in targets:
+                self._checkpoint()
+                view.clients[vm["id"]].revert_snapshot(vm["id"], scenario["snapshot"])
 
         total = len(scenario["steps"])
         for index, step in enumerate(scenario["steps"], start=1):
@@ -643,6 +692,99 @@ class Orchestrator:
         self._step("stop_empty_hosts", ", ".join(empty))
         for name in empty:
             self._stop_host(self._host(name))
+
+    # ---------------------------------------------------------------- snapshots
+
+    def _snapshot_targets(self, view: View, vm_ids: list[str]) -> list[dict[str, Any]]:
+        known = self._store.get("vms")
+        missing = [vm for vm in vm_ids if vm not in view.vms]
+        if missing:
+            names = [known.get(vm, {}).get("name", vm) for vm in missing]
+            # Known but not listed: its host is off.
+            code = "vm_unreachable" if all(vm in known for vm in missing) else "vm_not_found"
+            raise OperationFailed(code, ", ".join(names))
+        vms = [view.vms[vm] for vm in vm_ids]
+        # vCenter and Proxmox list the VMs of a host that is off, nothing can be done with them.
+        down = [
+            vm["name"]
+            for vm in vms
+            if vm.get("host") and not view.hosts.get(vm["host"], {}).get("connected")
+        ]
+        if down:
+            raise OperationFailed("vm_unreachable", ", ".join(down))
+        system = [vm["name"] for vm in vms if is_system_vm(vm)]
+        if system:
+            raise OperationFailed("vm_protected", ", ".join(system))
+        return vms
+
+    def _live_snapshots(self, view: View, vm: dict[str, Any]) -> list[str]:
+        try:
+            return view.clients[vm["id"]].snapshots(vm["id"])
+        except GuestNotFound as err:
+            raise OperationFailed("vm_not_found", vm["name"]) from err
+
+    def _check_revert(self, view: View, vms: list[dict[str, Any]], name: str) -> None:
+        """Refuse before anything is reverted: protected VMs, missing snapshots."""
+        protected = [
+            vm["name"]
+            for vm in vms
+            if self._is_protected(vm) or vm["name"] == self._config.vcenter_vm_name
+        ]
+        if protected:
+            raise OperationFailed("vm_protected", ", ".join(protected))
+        without = [vm["name"] for vm in vms if name not in self._live_snapshots(view, vm)]
+        if without:
+            raise OperationFailed("snapshot_not_found", f"{name}: {', '.join(without)}")
+
+    def _snapshot_plan(self, vms: list[dict[str, Any]], name: str) -> None:
+        assert self._op is not None  # noqa: S101
+        self._op["plan"] = {"snapshot": name, "vms": [vm["name"] for vm in vms]}
+        self._publish()
+
+    def _snapshot_create(self, body: dict[str, Any]) -> None:
+        name = body["name"]
+        self._step("preflight", name)
+        view = self._view()
+        vms = self._snapshot_targets(view, body["vms"])
+        taken = [vm["name"] for vm in vms if name in self._live_snapshots(view, vm)]
+        if taken:
+            raise OperationFailed("snapshot_exists", f"{name}: {', '.join(taken)}")
+        self._snapshot_plan(vms, name)
+        for vm in vms:
+            self._step("snapshot_create", f"{name}: {vm['name']}")
+            view.clients[vm["id"]].create_snapshot(
+                vm["id"],
+                name,
+                body["description"],
+                memory=body["memory"] and vm["power"] == "on",
+            )
+
+    def _snapshot_revert(self, body: dict[str, Any]) -> None:
+        name = body["name"]
+        self._step("preflight", name)
+        view = self._view()
+        vms = self._snapshot_targets(view, body["vms"])
+        self._check_revert(view, vms, name)
+        self._snapshot_plan(vms, name)
+        for vm in vms:
+            self._step("snapshot_revert", f"{name}: {vm['name']}")
+            client = view.clients[vm["id"]]
+            client.revert_snapshot(vm["id"], name)
+            if body["start"] and client.vm_status(vm["id"])["power"] != "on":
+                client.power_on(vm["id"])
+
+    def _snapshot_delete(self, body: dict[str, Any]) -> None:
+        name = body["name"]
+        self._step("preflight", name)
+        view = self._view()
+        vms = self._snapshot_targets(view, body["vms"])
+        without = [vm["name"] for vm in vms if name not in self._live_snapshots(view, vm)]
+        if without:
+            raise OperationFailed("snapshot_not_found", f"{name}: {', '.join(without)}")
+        self._snapshot_plan(vms, name)
+        for vm in vms:
+            self._step("snapshot_delete", f"{name}: {vm['name']}")
+            view.clients[vm["id"]].delete_snapshot(vm["id"], name)
 
     # ---------------------------------------------------------------- single VM
 

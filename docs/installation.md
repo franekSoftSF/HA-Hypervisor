@@ -109,6 +109,7 @@ Create a role and assign it to the agent account on the vCenter root, with propa
 | Virtual machine, Interaction, Power on | Starting VMs |
 | Virtual machine, Interaction, Power off | Stopping VMs, including guest shutdown |
 | Global, Settings | vCLS Retreat Mode |
+| Virtual machine, Snapshot management, Create, Revert, Remove | Snapshot actions and scenarios that revert first |
 
 ### ESXi
 
@@ -139,7 +140,7 @@ a scenario stops and "power off empty hosts" is on, it keeps enough nodes on for
 Create a user, a role and a token on any node (in a cluster once, it is shared):
 
 ```bash
-pveum role add HAHypervisor -privs "VM.Audit VM.PowerMgmt VM.GuestAgent.Audit Sys.Audit Sys.PowerMgmt Sys.Console Datastore.Audit"
+pveum role add HAHypervisor -privs "VM.Audit VM.PowerMgmt VM.Snapshot VM.Snapshot.Rollback VM.GuestAgent.Audit Sys.Audit Sys.PowerMgmt Sys.Console Datastore.Audit"
 ```
 
 ```bash
@@ -181,7 +182,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.5.1
+VERSION=0.6.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -385,6 +386,31 @@ The same works from a Stream Deck or Macro Deck plugin for Home Assistant: choos
 action, the key then also shows the VM state. Scenarios and the cluster work the same way through their buttons
 (`button.press`) or the actions `ha_hypervisor.start_scenario` and `ha_hypervisor.stop_scenario`. A cluster shutdown
 always needs the arm switch first, also from a button pad.
+
+### Snapshots, for example a demo lab that returns to a clean state
+
+Three actions work on VMs of both platforms, selected by device or by any of their entities, also VMs of two agents
+at once: **Create snapshot** (`ha_hypervisor.create_snapshot`), **Revert to snapshot** and **Delete snapshot**. Each VM
+has a **Snapshots** sensor with the names as an attribute.
+
+- A revert is checked on every selected VM before any is reverted: the snapshot must exist everywhere, vCenter and
+  protected VMs are refused. The current state of the VM is lost, that is the point.
+- **Include memory** returns to a running VM; without it the VM is off after a revert, **Start afterwards** powers it on.
+  Proxmox containers always get a disk snapshot.
+- A scenario can **revert to a snapshot before start**: every VM of the scenario returns to it first, then the groups
+  start as usual.
+
+```yaml
+# After the demo: put the lab back for the next one
+action: ha_hypervisor.revert_snapshot
+target:
+  entity_id: [switch.web01_power, switch.db01_power]
+data:
+  name: Clean
+  start: false
+```
+
+Names use 2 to 40 letters, digits, `-` and `_`, starting with a letter (the Proxmox rule, kept on both platforms).
 
 ### Agent check after updates
 

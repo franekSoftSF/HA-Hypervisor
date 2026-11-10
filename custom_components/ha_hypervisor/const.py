@@ -13,6 +13,7 @@ CONF_DELAY = "delay"
 CONF_TIMEOUT = "timeout"
 CONF_ADD_ANOTHER = "add_another"
 CONF_POWER_OFF_EMPTY = "power_off_empty_hosts"
+CONF_SNAPSHOT = "snapshot"
 
 COMMAND_TIMEOUT = 15
 AGENT_DISCOVERY_TIMEOUT = 15

@@ -37,14 +37,22 @@
           "title": "New scenario",
           "data": {
             "name": "Name",
-            "power_off_empty_hosts": "Power off hosts left empty when stopping"
+            "power_off_empty_hosts": "Power off hosts left empty when stopping",
+            "snapshot": "Revert to snapshot before start"
+          },
+          "data_description": {
+            "snapshot": "Optional. Every VM of the scenario is reverted to this snapshot before it starts, for example a demo lab that must start clean. Leave empty to start the VMs as they are."
           }
         },
         "reconfigure": {
           "title": "Edit scenario",
           "data": {
             "name": "Name",
-            "power_off_empty_hosts": "Power off hosts left empty when stopping"
+            "power_off_empty_hosts": "Power off hosts left empty when stopping",
+            "snapshot": "Revert to snapshot before start"
+          },
+          "data_description": {
+            "snapshot": "Optional. Every VM of the scenario is reverted to this snapshot before it starts. Leave empty to start the VMs as they are."
           }
         },
         "group": {
@@ -59,7 +67,10 @@
           }
         }
       },
-      "error": { "no_vms_selected": "Select at least one VM." },
+      "error": {
+        "no_vms_selected": "Select at least one VM.",
+        "invalid_snapshot_name": "2 to 40 letters, digits, - and _, starting with a letter."
+      },
       "abort": {
         "no_vms_known": "The agent has not reported any VMs yet.",
         "reconfigure_successful": "The scenario was saved."
@@ -141,7 +152,10 @@
           "start_vms": "Starting VMs",
           "stop_empty_hosts": "Stopping empty hosts",
           "wait_quorum": "Waiting for cluster quorum",
-          "restore_ha": "Starting HA resources again"
+          "restore_ha": "Starting HA resources again",
+          "snapshot_create": "Taking snapshots",
+          "snapshot_revert": "Reverting to snapshots",
+          "snapshot_delete": "Deleting snapshots"
         }
       },
       "scenario_state": {
@@ -158,6 +172,7 @@
       "vm_cpu_used": { "name": "CPU used" },
       "vm_host": { "name": "Host" },
       "vm_ip": { "name": "IP address" },
+      "vm_snapshots": { "name": "Snapshots", "unit_of_measurement": "snapshots" },
       "vm_memory_used": { "name": "Memory used" },
       "vm_storage": { "name": "Storage used" },
       "vms_running": { "name": "VMs running" },
@@ -185,6 +200,8 @@
     "not_armed": { "message": "Turn on the Arm cluster shutdown switch first." },
     "confirm_required": { "message": "Set confirm to true to shut the cluster down." },
     "agent_ambiguous": { "message": "Select the agent with config_entry_id." },
+    "invalid_snapshot_name": { "message": "Snapshot name {name}: use 2 to 40 letters, digits, - and _, starting with a letter." },
+    "no_vm_selected": { "message": "Select at least one virtual machine of HA Hypervisor." },
     "scenario_not_found": { "message": "Scenario {name} does not exist." },
     "agent_busy": { "message": "Another operation is running." },
     "agent_not_configured": { "message": "The agent has no vCenter or ESXi hosts configured yet." },
@@ -213,9 +230,35 @@
     "agent_vsphere_error": { "message": "vSphere returned an error, see the agent log." },
     "agent_proxmox_unavailable": { "message": "The Proxmox API does not answer." },
     "agent_proxmox_error": { "message": "Proxmox returned an error, see the agent log." },
-    "agent_quorum_timeout": { "message": "The Proxmox cluster did not reach quorum in time." }
+    "agent_quorum_timeout": { "message": "The Proxmox cluster did not reach quorum in time." },
+    "agent_snapshot_not_found": { "message": "The snapshot does not exist on every selected VM, nothing was changed." },
+    "agent_snapshot_exists": { "message": "A snapshot with this name already exists, nothing was changed." }
   },
   "services": {
+    "create_snapshot": {
+      "name": "Create snapshot",
+      "description": "Takes a snapshot of the selected VMs, on vSphere or Proxmox. Refused if the name already exists on one of them.",
+      "fields": {
+        "name": { "name": "Name", "description": "2 to 40 letters, digits, - and _, starting with a letter." },
+        "description": { "name": "Description", "description": "Stored with the snapshot." },
+        "memory": { "name": "Include memory", "description": "Also save the memory of running VMs, so a revert returns to a running VM. Slower and larger. Containers always get a disk snapshot." }
+      }
+    },
+    "revert_snapshot": {
+      "name": "Revert to snapshot",
+      "description": "Returns the selected VMs to a snapshot. Their current state is lost. Checked on every VM before any is reverted; vCenter and protected VMs are refused.",
+      "fields": {
+        "name": { "name": "Name", "description": "Snapshot to return to." },
+        "start": { "name": "Start afterwards", "description": "Power on VMs that are off after the revert." }
+      }
+    },
+    "delete_snapshot": {
+      "name": "Delete snapshot",
+      "description": "Removes a snapshot from the selected VMs.",
+      "fields": {
+        "name": { "name": "Name", "description": "Snapshot to delete." }
+      }
+    },
     "start_scenario": {
       "name": "Start scenario",
       "description": "Starts the hosts a scenario needs and its VMs in order.",

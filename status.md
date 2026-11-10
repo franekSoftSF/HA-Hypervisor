@@ -1,6 +1,6 @@
 # Status
 
-Version 0.5.1, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
+Version 0.6.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
@@ -11,6 +11,8 @@ Version 0.5.1, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
   manager and HA resources are started again after quorum. CLI proxmox set and node add. Tested against a simulated
   Proxmox API (tests/agent/fake_pve.py), also end to end over HTTPS with Wake on LAN.
 - Several agents on one machine: systemd template ha-hypervisor-agent@NAME, CLI --instance NAME, own state file.
+- Snapshots on both platforms: create, revert, delete actions in HA, Snapshots sensor per VM, scenario option
+  "revert to snapshot before start". Preflight checks every VM first; vCenter and protected VMs are never reverted.
 - Repairs after every start: agent not answering within a minute, agent older than the integration.
 - Tests in Docker on the real Home Assistant 2026.11 image, hassfest, end-to-end stack with `vcsim`.
 
@@ -39,9 +41,7 @@ Version 0.5.1, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
 ## Requested next (2026-11-10, after 0.5.1)
 
 The user runs two agents: one for vCenter, one for Proxmox (now possible with `--instance`).
-1. Snapshots in the agent, both platforms: create, revert, delete per VM; a scenario option "revert to snapshot
-   before start" for a demo lab that must come back clean. Agent commands follow the protocol rules (signed, expiring,
-   never retained), revert of a running VM needs preflight like everything else.
+1. Snapshots: done in 0.6.0.
 2. Mixed scenarios in Home Assistant: one scenario with VMs from both agents (vCenter and Proxmox), run by HA in
    order, each step sent to the agent that owns the VM.
 3. Schedules and automations: the existing switches, buttons and actions already work in HA automations; add

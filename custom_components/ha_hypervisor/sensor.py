@@ -212,6 +212,13 @@ async def async_setup_entry(
 
     track_items(link, entry, SECTION_HOSTS, sensors(SECTION_HOSTS, HOST_SENSORS), async_add_entities)
     track_items(link, entry, SECTION_VMS, sensors(SECTION_VMS, VM_SENSORS), async_add_entities)
+    track_items(
+        link,
+        entry,
+        SECTION_VMS,
+        lambda item: [] if item.get("system") else [VmSnapshots(link, item)],
+        async_add_entities,
+    )
     track_items(link, entry, SECTION_DATASTORES, sensors(SECTION_DATASTORES, DATASTORE_SENSORS), async_add_entities)
 
     for subentry in scenario_subentries(entry):
@@ -345,3 +352,23 @@ class ScenarioStateSensor(ScenarioEntity, SensorEntity):
         if status is None or status["vms_on"] == 0:
             return SCENARIO_INACTIVE
         return SCENARIO_ACTIVE if status["vms_on"] == status["vms_total"] else SCENARIO_PARTIAL
+
+
+class VmSnapshots(ItemEntity, SensorEntity):
+    """Number of snapshots of a VM, their names as an attribute."""
+
+    _attr_translation_key = "vm_snapshots"
+
+    def __init__(self, link: AgentLink, item: dict[str, Any]) -> None:
+        """Set the identity."""
+        super().__init__(link, SECTION_VMS, item, "snapshots")
+
+    @property
+    def native_value(self) -> int | None:
+        """Return how many snapshots the VM has."""
+        return len(self.item.get("snapshots") or []) if self.item else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the names, oldest first."""
+        return {"snapshots": list((self.item or {}).get("snapshots") or [])}

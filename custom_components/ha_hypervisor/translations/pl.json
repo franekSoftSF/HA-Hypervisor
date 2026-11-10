@@ -37,14 +37,22 @@
           "title": "Nowy scenariusz",
           "data": {
             "name": "Nazwa",
-            "power_off_empty_hosts": "Wyłącz puste hosty przy zatrzymywaniu"
+            "power_off_empty_hosts": "Wyłącz puste hosty przy zatrzymywaniu",
+            "snapshot": "Przywróć migawkę przed startem"
+          },
+          "data_description": {
+            "snapshot": "Opcjonalnie. Każda maszyna scenariusza zostanie przywrócona do tej migawki przed startem, np. laboratorium pokazowe, które ma startować czyste. Zostaw puste, aby uruchomić maszyny w obecnym stanie."
           }
         },
         "reconfigure": {
           "title": "Edycja scenariusza",
           "data": {
             "name": "Nazwa",
-            "power_off_empty_hosts": "Wyłącz puste hosty przy zatrzymywaniu"
+            "power_off_empty_hosts": "Wyłącz puste hosty przy zatrzymywaniu",
+            "snapshot": "Przywróć migawkę przed startem"
+          },
+          "data_description": {
+            "snapshot": "Opcjonalnie. Każda maszyna scenariusza zostanie przywrócona do tej migawki przed startem. Zostaw puste, aby uruchomić maszyny w obecnym stanie."
           }
         },
         "group": {
@@ -59,7 +67,10 @@
           }
         }
       },
-      "error": { "no_vms_selected": "Wybierz co najmniej jedną maszynę." },
+      "error": {
+        "no_vms_selected": "Wybierz co najmniej jedną maszynę.",
+        "invalid_snapshot_name": "Od 2 do 40 liter, cyfr, - i _, zaczynając od litery."
+      },
       "abort": {
         "no_vms_known": "Agent nie zgłosił jeszcze żadnych maszyn.",
         "reconfigure_successful": "Scenariusz został zapisany."
@@ -141,7 +152,10 @@
           "start_vms": "Uruchamianie maszyn",
           "stop_empty_hosts": "Wyłączanie pustych hostów",
           "wait_quorum": "Oczekiwanie na kworum klastra",
-          "restore_ha": "Ponowne uruchamianie zasobów HA"
+          "restore_ha": "Ponowne uruchamianie zasobów HA",
+          "snapshot_create": "Tworzenie migawek",
+          "snapshot_revert": "Przywracanie migawek",
+          "snapshot_delete": "Usuwanie migawek"
         }
       },
       "scenario_state": {
@@ -158,6 +172,7 @@
       "vm_cpu_used": { "name": "Zużyte CPU" },
       "vm_host": { "name": "Host" },
       "vm_ip": { "name": "Adres IP" },
+      "vm_snapshots": { "name": "Migawki", "unit_of_measurement": "migawek" },
       "vm_memory_used": { "name": "Zużyta pamięć" },
       "vm_storage": { "name": "Zajęty dysk" },
       "vms_running": { "name": "Działające maszyny" },
@@ -185,6 +200,8 @@
     "not_armed": { "message": "Najpierw włącz przełącznik Odbezpiecz wyłączenie klastra." },
     "confirm_required": { "message": "Ustaw confirm na true, aby wyłączyć klaster." },
     "agent_ambiguous": { "message": "Wskaż agenta polem config_entry_id." },
+    "invalid_snapshot_name": { "message": "Nazwa migawki {name}: od 2 do 40 liter, cyfr, - i _, zaczynając od litery." },
+    "no_vm_selected": { "message": "Wybierz co najmniej jedną maszynę HA Hypervisor." },
     "scenario_not_found": { "message": "Scenariusz {name} nie istnieje." },
     "agent_busy": { "message": "Trwa inna operacja." },
     "agent_not_configured": { "message": "Agent nie ma jeszcze skonfigurowanego vCenter ani hostów ESXi." },
@@ -213,9 +230,35 @@
     "agent_vsphere_error": { "message": "vSphere zwrócił błąd, sprawdź log agenta." },
     "agent_proxmox_unavailable": { "message": "API Proxmox nie odpowiada." },
     "agent_proxmox_error": { "message": "Proxmox zwrócił błąd, sprawdź log agenta." },
-    "agent_quorum_timeout": { "message": "Klaster Proxmox nie uzyskał kworum na czas." }
+    "agent_quorum_timeout": { "message": "Klaster Proxmox nie uzyskał kworum na czas." },
+    "agent_snapshot_not_found": { "message": "Migawka nie istnieje na każdej wybranej maszynie, nic nie zmieniono." },
+    "agent_snapshot_exists": { "message": "Migawka o tej nazwie już istnieje, nic nie zmieniono." }
   },
   "services": {
+    "create_snapshot": {
+      "name": "Utwórz migawkę",
+      "description": "Tworzy migawkę wybranych maszyn, w vSphere lub Proxmox. Odmawia, jeśli nazwa już istnieje na którejś z nich.",
+      "fields": {
+        "name": { "name": "Nazwa", "description": "Od 2 do 40 liter, cyfr, - i _, zaczynając od litery." },
+        "description": { "name": "Opis", "description": "Zapisywany razem z migawką." },
+        "memory": { "name": "Z pamięcią", "description": "Zapisz też pamięć działających maszyn, aby przywrócenie wracało do działającej maszyny. Wolniejsze i większe. Kontenery zawsze dostają migawkę dysku." }
+      }
+    },
+    "revert_snapshot": {
+      "name": "Przywróć migawkę",
+      "description": "Przywraca wybrane maszyny do migawki. Ich obecny stan przepada. Sprawdzane na każdej maszynie, zanim którakolwiek zostanie przywrócona; vCenter i maszyny chronione są odrzucane.",
+      "fields": {
+        "name": { "name": "Nazwa", "description": "Migawka, do której wrócić." },
+        "start": { "name": "Uruchom potem", "description": "Włącz maszyny, które po przywróceniu są wyłączone." }
+      }
+    },
+    "delete_snapshot": {
+      "name": "Usuń migawkę",
+      "description": "Usuwa migawkę z wybranych maszyn.",
+      "fields": {
+        "name": { "name": "Nazwa", "description": "Migawka do usunięcia." }
+      }
+    },
     "start_scenario": {
       "name": "Uruchom scenariusz",
       "description": "Włącza hosty potrzebne scenariuszowi i kolejno jego maszyny.",

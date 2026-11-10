@@ -17,6 +17,7 @@
       "operation_step": { "default": "mdi:format-list-numbered" },
       "scenario_state": { "default": "mdi:playlist-play" },
       "vms_running": { "default": "mdi:desktop-classic" },
+      "vm_snapshots": { "default": "mdi:camera-burst" },
       "vms_total": { "default": "mdi:desktop-classic" }
     },
     "switch": {
@@ -28,6 +29,9 @@
     }
   },
   "services": {
+    "create_snapshot": { "service": "mdi:camera-plus" },
+    "revert_snapshot": { "service": "mdi:camera-retake" },
+    "delete_snapshot": { "service": "mdi:camera-off" },
     "shutdown_cluster": { "service": "mdi:power" },
     "start_cluster": { "service": "mdi:server-plus" },
     "start_scenario": { "service": "mdi:play" },

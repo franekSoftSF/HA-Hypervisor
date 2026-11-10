@@ -10,7 +10,7 @@ from homeassistant.core import callback
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
-from .const import CONF_POWER_OFF_EMPTY, CONF_STEPS, DOMAIN, SUBENTRY_SCENARIO
+from .const import CONF_POWER_OFF_EMPTY, CONF_SNAPSHOT, CONF_STEPS, DOMAIN, SUBENTRY_SCENARIO
 from .link import AgentLink
 
 SECTION_HOSTS = "hosts"
@@ -70,6 +70,7 @@ def scenario_payload(subentry: ConfigSubentry) -> dict[str, Any]:
         "name": subentry.title,
         "steps": list(subentry.data[CONF_STEPS]),
         CONF_POWER_OFF_EMPTY: subentry.data.get(CONF_POWER_OFF_EMPTY, False),
+        CONF_SNAPSHOT: subentry.data.get(CONF_SNAPSHOT) or None,
     }
 
 

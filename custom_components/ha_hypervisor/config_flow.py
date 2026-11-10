@@ -36,6 +36,7 @@ from .const import (
     CONF_AGENT_ID,
     CONF_DELAY,
     CONF_POWER_OFF_EMPTY,
+    CONF_SNAPSHOT,
     CONF_SHARED_KEY,
     CONF_STEPS,
     CONF_TIMEOUT,
@@ -47,6 +48,7 @@ from .const import (
 from .protocol import (
     LEAF_INFO,
     PROTOCOL_VERSION,
+    SNAPSHOT_NAME,
     WAIT_MODES,
     WAIT_TOOLS,
     ProtocolError,
@@ -167,6 +169,7 @@ class ScenarioFlow(ConfigSubentryFlow):
         """Start empty."""
         self._name = ""
         self._power_off = False
+        self._snapshot = ""
         self._steps: list[dict[str, Any]] = []
         self._existing: list[dict[str, Any]] = []
         self._editing = False
@@ -188,6 +191,9 @@ class ScenarioFlow(ConfigSubentryFlow):
                 vol.Required(
                     CONF_POWER_OFF_EMPTY, default=self._power_off
                 ): BooleanSelector(),
+                vol.Optional(
+                    CONF_SNAPSHOT, description={"suggested_value": self._snapshot or None}
+                ): str,
             }
         )
 
@@ -197,11 +203,15 @@ class ScenarioFlow(ConfigSubentryFlow):
         """Ask for the name and options."""
         if not self._vm_options():
             return self.async_abort(reason="no_vms_known")
+        errors: dict[str, str] = {}
         if user_input is not None:
             self._name = user_input["name"]
             self._power_off = user_input[CONF_POWER_OFF_EMPTY]
-            return await self.async_step_group()
-        return self.async_show_form(step_id="user", data_schema=self._options_schema())
+            if self._read_snapshot(user_input, errors):
+                return await self.async_step_group()
+        return self.async_show_form(
+            step_id="user", data_schema=self._options_schema(), errors=errors
+        )
 
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
@@ -210,17 +220,29 @@ class ScenarioFlow(ConfigSubentryFlow):
         subentry = self._get_reconfigure_subentry()
         if not self._vm_options():
             return self.async_abort(reason="no_vms_known")
+        errors: dict[str, str] = {}
         if user_input is not None:
             self._name = user_input["name"]
             self._power_off = user_input[CONF_POWER_OFF_EMPTY]
-            self._existing = list(subentry.data[CONF_STEPS])
-            self._editing = True
-            return await self.async_step_group()
-        self._name = subentry.title
-        self._power_off = subentry.data.get(CONF_POWER_OFF_EMPTY, False)
+            if self._read_snapshot(user_input, errors):
+                self._existing = list(subentry.data[CONF_STEPS])
+                self._editing = True
+                return await self.async_step_group()
+        else:
+            self._name = subentry.title
+            self._power_off = subentry.data.get(CONF_POWER_OFF_EMPTY, False)
+            self._snapshot = subentry.data.get(CONF_SNAPSHOT) or ""
         return self.async_show_form(
-            step_id="reconfigure", data_schema=self._options_schema()
+            step_id="reconfigure", data_schema=self._options_schema(), errors=errors
         )
+
+    def _read_snapshot(self, user_input: dict[str, Any], errors: dict[str, str]) -> bool:
+        """Keep the snapshot to revert to before a start, empty for none."""
+        self._snapshot = (user_input.get(CONF_SNAPSHOT) or "").strip()
+        if self._snapshot and not SNAPSHOT_NAME.match(self._snapshot):
+            errors[CONF_SNAPSHOT] = "invalid_snapshot_name"
+            return False
+        return True
 
     def _group_schema(self, options: list[SelectOptionDict]) -> vol.Schema:
         index = len(self._steps)
@@ -303,6 +325,8 @@ class ScenarioFlow(ConfigSubentryFlow):
 
     def _finish(self) -> SubentryFlowResult:
         data = {CONF_POWER_OFF_EMPTY: self._power_off, CONF_STEPS: self._steps}
+        if self._snapshot:
+            data[CONF_SNAPSHOT] = self._snapshot
         if self._editing:
             # Not the reloading variant: the entry listener already reloads.
             return self.async_update_and_abort(
