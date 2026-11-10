@@ -126,6 +126,32 @@ def test_mqtt_default_ports(path, arguments, port):
     assert data(path)["mqtt"]["port"] == port
 
 
+@pytest.mark.parametrize(
+    ("arguments", "tls"),
+    [
+        (["--transport", "tcp", "--port", "1883"], False),
+        (["--transport", "websockets", "--port", "1884"], False),
+        (["--port", "1883", "--tls"], True),
+        (["--port", "8883"], True),
+    ],
+)
+def test_plain_ports_mean_no_tls(path, arguments, tls, capsys):
+    run(path, "init")
+    assert run(path, "mqtt", "set", "--host", "b", *arguments) == 0
+    assert data(path)["mqtt"].get("tls", True) is tls
+    assert ("(no TLS)" in capsys.readouterr().out) is not tls
+
+
+def test_tls_failure_suggests_no_tls(path, monkeypatch, capsys):
+    run(path, "init")
+    run(path, "mqtt", "set", "--host", "b", "--port", "8883")
+    monkeypatch.setattr(
+        cli, "test_mqtt", lambda *_: "[SSL: UNEXPECTED_EOF_WHILE_READING] EOF occurred"
+    )
+    assert run(path, "mqtt", "test") == 1
+    assert "--no-tls" in capsys.readouterr().out
+
+
 def test_mqtt_needs_a_password_for_a_login(path, stdin):
     run(path, "init")
     assert run(path, "mqtt", "set", "--host", "b", "--username", "u") == cli.EXIT_CONFIG

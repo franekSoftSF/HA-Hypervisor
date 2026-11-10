@@ -40,6 +40,7 @@ _REQUIRED = {
     "hosts": "esxi add",
 }
 EXIT_CONFIG = 2
+_PLAIN_PORTS = (1883, 1884)
 
 
 class ConfigFile:
@@ -215,6 +216,10 @@ def cmd_mqtt_set(args: argparse.Namespace) -> int:
     )
     if "host" not in settings:
         raise ConfigError("--host is required")
+    if args.tls is None and args.port is not None and args.port in _PLAIN_PORTS:
+        # 1883 and 1884 are the unencrypted ports of every broker: asking for
+        # one of them means no TLS, unless --tls says otherwise.
+        settings["tls"] = False
     if args.no_auth:
         settings.pop("username", None)
         settings.pop("password", None)
@@ -228,7 +233,8 @@ def cmd_mqtt_set(args: argparse.Namespace) -> int:
     build_mqtt(settings)
     data["mqtt"] = settings
     target.save(data)
-    _say(f"Saved MQTT connection to {settings['host']}:{settings['port']}")
+    tls = "TLS" if settings.get("tls", True) else "no TLS"
+    _say(f"Saved MQTT connection to {settings['host']}:{settings['port']} ({tls})")
     return 0
 
 
@@ -241,6 +247,8 @@ def cmd_mqtt_test(args: argparse.Namespace) -> int:
     problem = test_mqtt(settings, data["agent_id"])
     if problem:
         _say(f"FAIL  MQTT {settings.host}:{settings.port}: {problem}")
+        if settings.tls and "SSL" in problem:
+            _say("      The broker may not use TLS on this port, try: mqtt set --no-tls")
         return 1
     _say(f"OK    MQTT {settings.host}:{settings.port}")
     return 0

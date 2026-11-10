@@ -17,7 +17,8 @@ test "$(stat -c '%U %a' /var/lib/$NAME)" = "$NAME 750"
 
 $NAME init --agent-id debtest
 test "$(stat -c '%U:%G %a' $CONFIG)" = "root:$NAME 640"
-$NAME mqtt set --host mosquitto --no-tls
+# As a user would type it: the plain port alone must turn TLS off.
+$NAME mqtt set --host mosquitto --transport tcp --port 1883
 $NAME mqtt test
 printf 'pass\n' | $NAME vcenter set --host vcsim --username user --password-stdin
 $NAME vcenter test

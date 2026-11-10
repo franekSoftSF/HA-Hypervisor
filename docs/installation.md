@@ -141,7 +141,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.3.0
+VERSION=0.3.1
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -157,7 +157,7 @@ Create the configuration. The command prints the **agent ID and shared key** nee
 sudo ha-hypervisor-agent init --agent-id lab
 ```
 
-MQTT, with option A from section 2. For option B use `--transport tcp --port 8883`:
+MQTT, with option A from section 2. For option B use `--transport tcp --port 8883`. In a trusted local network a plain connection works too: `--transport tcp --port 1883` (TLS is then off):
 
 ```bash
 sudo ha-hypervisor-agent mqtt set --host mqtt.example.com --transport websockets --username ha-hypervisor-agent
