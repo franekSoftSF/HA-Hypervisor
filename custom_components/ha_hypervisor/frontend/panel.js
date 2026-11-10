@@ -36,6 +36,7 @@ const TEXT = {
 const CLUSTER_KEYS = [
   "cluster_state",
   "vcenter_reachable",
+  "proxmox_reachable",
   "cluster_cpu_percent",
   "cluster_memory_percent",
   "hosts_online",

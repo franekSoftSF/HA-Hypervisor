@@ -16,6 +16,13 @@ services:
     image: vmware/vcsim:latest
     command: ["-l", "0.0.0.0:443", "-esx", "-vm", "1", "-ds", "1"]
 
+  # Simulated Proxmox VE 9 single node with its own certificate, like a real one.
+  pve:
+    image: ha-hypervisor-test-agent
+    volumes:
+      - ../agent/fake_pve.py:/fake_pve.py:ro
+    command: ["python", "/fake_pve.py", "--tls", "--node", "pve=8006"]
+
   homeassistant:
     image: ghcr.io/home-assistant/home-assistant:stable
     volumes:
@@ -31,6 +38,12 @@ services:
     depends_on: [mosquitto, vcsim]
     volumes:
       - ./agent-config.yaml:/config/config.yaml:ro
+
+  agent-pve:
+    build: ../../agent
+    depends_on: [mosquitto, pve]
+    volumes:
+      - ./agent-pve-config.yaml:/config/config.yaml:ro
 
   driver:
     image: ha-hypervisor-test-agent

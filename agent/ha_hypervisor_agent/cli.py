@@ -21,8 +21,10 @@ from .config import (
     DEFAULT_CONFIG,
     PACKAGE_STATE_FILE,
     ConfigError,
+    PROXMOX_PORT,
     build_host,
     build_mqtt,
+    build_proxmox,
     build_vcenter,
     expand,
     load,
@@ -36,11 +38,16 @@ _GROUP = "ha-hypervisor-agent"
 _SERVICE = "ha-hypervisor-agent"
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _HIDDEN = "********"
-_SECRET_KEYS = ("password", "shared_key")
+_SECRET_KEYS = ("password", "shared_key", "token_secret")
 _REQUIRED = {
     "mqtt": "mqtt set",
     "vcenter": "vcenter set",
     "hosts": "esxi add",
+}
+_REQUIRED_PROXMOX = {
+    "mqtt": "mqtt set",
+    "proxmox": "proxmox set",
+    "hosts": "node add",
 }
 EXIT_CONFIG = 2
 _PLAIN_PORTS = (1883, 1884)
@@ -200,7 +207,8 @@ def cmd_show(args: argparse.Namespace) -> int:
     """Print the configuration without secrets."""
     data = ConfigFile(args.config).load()
     _say(yaml.safe_dump(_redact(data), sort_keys=False, allow_unicode=True).rstrip())
-    missing = [command for key, command in _REQUIRED.items() if not data.get(key)]
+    required = _REQUIRED_PROXMOX if data.get("platform") == "proxmox" else _REQUIRED
+    missing = [command for key, command in required.items() if not data.get(key)]
     if missing:
         _say("\nStill missing, run: " + ", ".join(missing))
     return 0
@@ -291,6 +299,7 @@ def cmd_vcenter_set(args: argparse.Namespace) -> int:
     """Set the vCenter connection."""
     target = ConfigFile(args.config)
     data = target.load()
+    _require_platform(data, "vmware")
     settings = dict(data.get("vcenter") or {})
     _apply(settings, args, ("host", "port", "username", "verify_ssl", "vm_name"))
     if args.no_vm_name:
@@ -382,10 +391,44 @@ def _merge_wol(args: argparse.Namespace, entry: dict[str, Any]) -> None:
     entry["wol"] = wol
 
 
+def _platform(data: dict[str, Any]) -> str:
+    return data.get("platform") or "vmware"
+
+
+def _require_platform(data: dict[str, Any], wanted: str) -> None:
+    """One agent drives one platform: a second one needs its own agent."""
+    current = _platform(data)
+    if current == wanted:
+        return
+    if wanted == "proxmox" and not data.get("platform") and not _uses_vmware(data):
+        raise ConfigError("set the API token first: ha-hypervisor-agent proxmox set --token-id ...")
+    commands = {"vmware": "vcenter set and esxi add", "proxmox": "proxmox set and node add"}
+    raise ConfigError(
+        f"this agent is set up for {current} ({commands[current]}). One agent drives one "
+        f"platform: install a second agent for {wanted}, with its own --config and agent id"
+    )
+
+
+def _uses_vmware(data: dict[str, Any]) -> bool:
+    return bool(data.get("vcenter")) or (
+        _platform(data) == "vmware" and bool(data.get("hosts"))
+    )
+
+
 def cmd_esxi_add(args: argparse.Namespace) -> int:
-    """Add a host, or change one with --update."""
+    """Add an ESXi host, or change one with --update."""
+    return _host_add(args, proxmox=False)
+
+
+def cmd_node_add(args: argparse.Namespace) -> int:
+    """Add a Proxmox node, or change one with --update."""
+    return _host_add(args, proxmox=True)
+
+
+def _host_add(args: argparse.Namespace, *, proxmox: bool) -> int:
     target = ConfigFile(args.config)
     data = target.load()
+    _require_platform(data, "proxmox" if proxmox else "vmware")
     hosts: list[dict[str, Any]] = list(data.get("hosts") or [])
     index = next((i for i, host in enumerate(hosts) if host["name"] == args.name), None)
     if index is not None and not args.update:
@@ -394,16 +437,21 @@ def cmd_esxi_add(args: argparse.Namespace) -> int:
         raise ConfigError(f"{args.name} does not exist")
 
     entry = dict(hosts[index]) if index is not None else {"name": args.name}
-    _apply(entry, args, ("address", "port", "username", "verify_ssl"))
+    if proxmox:
+        _apply(entry, args, ("address", "port"))
+        entry.setdefault("port", PROXMOX_PORT)
+    else:
+        _apply(entry, args, ("address", "port", "username", "verify_ssl"))
     entry.setdefault("address", args.name)
-    if "username" not in entry:
-        raise ConfigError("--username is required")
-    entry["password"] = _secret(
-        f"ESXi password for {args.name}",
-        args.password_env,
-        args.password_stdin,
-        entry.get("password"),
-    )
+    if not proxmox:
+        if "username" not in entry:
+            raise ConfigError("--username is required")
+        entry["password"] = _secret(
+            f"ESXi password for {args.name}",
+            args.password_env,
+            args.password_stdin,
+            entry.get("password"),
+        )
     _merge_bmc(args, entry)
     _merge_wol(args, entry)
     build_host(entry)
@@ -419,6 +467,86 @@ def cmd_esxi_add(args: argparse.Namespace) -> int:
         _say("Warning: without --bmc-address or --wol-mac the agent cannot power this host on.")
     _after_change()
     return 0
+
+
+# ------------------------------------------------------------------- proxmox
+
+
+def cmd_proxmox_set(args: argparse.Namespace) -> int:
+    """Set the Proxmox API token. This makes the agent a Proxmox agent."""
+    target = ConfigFile(args.config)
+    data = target.load()
+    if _uses_vmware(data):
+        _require_platform({"platform": "vmware"}, "proxmox")
+    settings = dict(data.get("proxmox") or {})
+    _apply(settings, args, ("token_id", "verify_ssl"))
+    if "token_id" not in settings:
+        raise ConfigError("--token-id is required, for example ha-hypervisor@pve!agent")
+    if "!" not in settings["token_id"]:
+        raise ConfigError("--token-id: use USER@REALM!TOKEN, for example ha-hypervisor@pve!agent")
+    settings["token_secret"] = _secret(
+        "Token secret", args.secret_env, args.secret_stdin, settings.get("token_secret")
+    )
+    build_proxmox(settings)
+    data["platform"] = "proxmox"
+    data["proxmox"] = settings
+    target.save(data)
+    _say(f"Saved Proxmox token {settings['token_id']}")
+    if not data.get("hosts"):
+        _say("Next: ha-hypervisor-agent node add NODE --address ADDRESS --bmc-address ...")
+    _after_change()
+    return 0
+
+
+def cmd_node_test(args: argparse.Namespace) -> int:
+    """Ask every node for its version, cluster, HA and power state."""
+    from .config import load as load_config  # noqa: PLC0415
+    from .pve import PveInfra, cluster_quorate  # noqa: PLC0415
+
+    config = load_config(args.config)
+    if config.proxmox is None:
+        raise ConfigError("no Proxmox token, run: ha-hypervisor-agent proxmox set")
+    selected = [host for host in config.hosts if args.name in (None, host.name)]
+    if not selected:
+        raise ConfigError("no such node, see: ha-hypervisor-agent node list")
+    infra = PveInfra(config)
+    failures = 0
+    for host in selected:
+        try:
+            client = infra.node(host)
+            version = client.version()
+            status = client.cluster_status()
+            guests = client.resources("vm")
+            ha = client.ha_resources()
+            nodes = [item.get("node") for item in client.resources("node")]
+        except (VimUnavailable, VimError) as err:
+            failures += 1
+            _say(f"FAIL  Proxmox {host.name} ({host.address}): {err}")
+        else:
+            cluster = next((item for item in status if item.get("type") == "cluster"), None)
+            if cluster is None:
+                kind = "single node"
+            else:
+                quorum = "quorate" if cluster_quorate(status) else "NO QUORUM"
+                kind = f"cluster {cluster.get('name')}, {quorum}"
+            _say(f"OK    Proxmox {host.name}: {version}, {kind}")
+            _say(f"      {len(guests)} guests, {len(ha)} HA resources")
+            if host.name not in nodes:
+                failures += 1
+                _say(f"FAIL  {host.name} is not a node name here, the nodes are: {', '.join(nodes)}")
+            for name in nodes:
+                if config.host(name) is None:
+                    _say(f"      node {name}: NOT configured, use node add")
+        power = infra.power(host)
+        methods = ", ".join(method.name for method in power.methods) or "none"
+        if power.verified():
+            _say(f"OK    Power {host.name}: {power.state()} (methods: {methods})")
+        elif power.can_wake():
+            _say(f"WARN  Power {host.name}: only Wake on LAN is left, it cannot be checked")
+        else:
+            failures += 1
+            _say(f"FAIL  Power {host.name}: no working method ({methods})")
+    return 1 if failures else 0
 
 
 def cmd_esxi_list(args: argparse.Namespace) -> int:
@@ -567,6 +695,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_mqtt(commands, common)
     _add_vcenter(commands, common)
     _add_esxi(commands, common)
+    _add_proxmox(commands, common)
     return parser
 
 
@@ -608,17 +737,48 @@ def _add_vcenter(commands: Any, common: argparse.ArgumentParser) -> None:
 
 
 def _add_esxi(commands: Any, common: argparse.ArgumentParser) -> None:
-    group = commands.add_parser("esxi", help="ESXi hosts").add_subparsers(
+    _add_hosts(commands, common, proxmox=False)
+
+
+def _add_proxmox(commands: Any, common: argparse.ArgumentParser) -> None:
+    group = commands.add_parser("proxmox", help="Proxmox VE API token").add_subparsers(
         dest="action", required=True
     )
-    item = group.add_parser("add", parents=[common], help="add or change a host")
-    item.add_argument("name", help="host name exactly as in vCenter")
-    item.add_argument("--update", action="store_true", help="change an existing host")
+    item = group.add_parser("set", parents=[common], help="set the API token")
+    item.add_argument("--token-id", help="USER@REALM!TOKEN, for example ha-hypervisor@pve!agent")
+    _bool_option(item, "--verify-ssl", "verify the node certificates, default off")
+    secret = item.add_mutually_exclusive_group()
+    secret.add_argument(
+        "--secret-stdin", action="store_true", help="read the token secret from standard input"
+    )
+    secret.add_argument(
+        "--secret-env",
+        type=_env_name,
+        metavar="NAME",
+        help="store a reference to this environment variable instead of the secret",
+    )
+    item.set_defaults(handler=cmd_proxmox_set)
+    test = group.add_parser("test", parents=[common], help="ask every node, nothing is changed")
+    test.set_defaults(handler=cmd_node_test, name=None)
+    _add_hosts(commands, common, proxmox=True)
+
+
+def _add_hosts(commands: Any, common: argparse.ArgumentParser, *, proxmox: bool) -> None:
+    noun = "node" if proxmox else "host"
+    group = commands.add_parser(
+        "node" if proxmox else "esxi", help="Proxmox nodes" if proxmox else "ESXi hosts"
+    ).add_subparsers(dest="action", required=True)
+    item = group.add_parser("add", parents=[common], help=f"add or change a {noun}")
+    item.add_argument(
+        "name", help="node name exactly as in Proxmox" if proxmox else "host name exactly as in vCenter"
+    )
+    item.add_argument("--update", action="store_true", help=f"change an existing {noun}")
     item.add_argument("--address", help="address used by the agent, default the name")
-    item.add_argument("--port", type=int)
-    item.add_argument("--username")
-    _bool_option(item, "--verify-ssl", "verify the certificate, default off")
-    _password_options(item)
+    item.add_argument("--port", type=int, help="default 8006" if proxmox else "default 443")
+    if not proxmox:
+        item.add_argument("--username")
+        _bool_option(item, "--verify-ssl", "verify the certificate, default off")
+        _password_options(item)
 
     bmc = item.add_argument_group("BMC (Redfish, IPMI)")
     bmc.add_argument("--bmc-address")
@@ -629,7 +789,7 @@ def _add_esxi(commands: Any, common: argparse.ArgumentParser) -> None:
     secret.add_argument(
         "--bmc-password-stdin",
         action="store_true",
-        help="read the BMC password from standard input, after the ESXi one",
+        help="read the BMC password from standard input, after the ESXi one if any",
     )
     secret.add_argument("--bmc-password-env", type=_env_name, metavar="NAME")
     bmc.add_argument("--no-bmc", action="store_true", help="remove the BMC")
@@ -638,15 +798,17 @@ def _add_esxi(commands: Any, common: argparse.ArgumentParser) -> None:
     wol.add_argument("--wol-mac")
     wol.add_argument("--wol-broadcast")
     wol.add_argument("--no-wol", action="store_true", help="remove Wake on LAN")
-    item.set_defaults(handler=cmd_esxi_add)
+    item.set_defaults(handler=cmd_node_add if proxmox else cmd_esxi_add)
 
-    group.add_parser("list", parents=[common], help="list the hosts").set_defaults(handler=cmd_esxi_list)
-    remove = group.add_parser("remove", parents=[common], help="remove a host")
+    group.add_parser("list", parents=[common], help=f"list the {noun}s").set_defaults(
+        handler=cmd_esxi_list
+    )
+    remove = group.add_parser("remove", parents=[common], help=f"remove a {noun}")
     remove.add_argument("name")
     remove.set_defaults(handler=cmd_esxi_remove)
     test = group.add_parser("test", parents=[common], help="log in and ask the BMC")
-    test.add_argument("name", nargs="?", help="only this host")
-    test.set_defaults(handler=cmd_esxi_test)
+    test.add_argument("name", nargs="?", help=f"only this {noun}")
+    test.set_defaults(handler=cmd_node_test if proxmox else cmd_esxi_test)
 
 
 def main(argv: list[str] | None = None) -> int:

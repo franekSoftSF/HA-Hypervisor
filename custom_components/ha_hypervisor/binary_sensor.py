@@ -1,4 +1,4 @@
-"""Binary sensors: agent, vCenter, hosts and VMware Tools."""
+"""Binary sensors: agent, management API (vCenter or Proxmox), hosts and guest tools."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from homeassistant.components.binary_sensor import (
     BinarySensorEntity,
 )
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import HaHypervisorConfigEntry
@@ -24,7 +24,22 @@ async def async_setup_entry(
 ) -> None:
     """Create the binary sensors."""
     link = entry.runtime_data
-    async_add_entities([AgentOnline(link), VCenterReachable(link)])
+    async_add_entities([AgentOnline(link)])
+
+    added: set[str] = set()
+
+    @callback
+    def add_api_sensor() -> None:
+        # The platform is known from the first state of the agent.
+        if link.state is None:
+            return
+        key = "proxmox_reachable" if link.is_proxmox else "vcenter_reachable"
+        if key not in added:
+            added.add(key)
+            async_add_entities([ApiReachable(link, key)])
+
+    add_api_sensor()
+    entry.async_on_unload(link.add_listener(add_api_sensor))
     track_items(link, entry, SECTION_HOSTS, lambda i: [HostConnected(link, i)], async_add_entities)
     track_items(link, entry, SECTION_VMS, lambda i: [ToolsRunning(link, i)], async_add_entities)
 
@@ -51,19 +66,19 @@ class AgentOnline(ClusterEntity, BinarySensorEntity):
         return self.link.online
 
 
-class VCenterReachable(ClusterEntity, BinarySensorEntity):
-    """Whether the agent can log in to vCenter."""
+class ApiReachable(ClusterEntity, BinarySensorEntity):
+    """Whether the agent can use vCenter or the Proxmox API."""
 
-    _attr_translation_key = "vcenter_reachable"
     _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
 
-    def __init__(self, link: AgentLink) -> None:
+    def __init__(self, link: AgentLink, key: str) -> None:
         """Set the identity."""
-        super().__init__(link, "vcenter_reachable")
+        super().__init__(link, key)
+        self._attr_translation_key = key
 
     @property
     def is_on(self) -> bool:
-        """Return True when vCenter answers."""
+        """Return True when the management API answers."""
         return bool((self.link.state or {}).get("vcenter", {}).get("reachable"))
 
 
@@ -84,15 +99,15 @@ class HostConnected(ItemEntity, BinarySensorEntity):
 
 
 class ToolsRunning(ItemEntity, BinarySensorEntity):
-    """Whether VMware Tools run in a guest."""
+    """Whether VMware Tools or the QEMU guest agent answer in a guest."""
 
-    _attr_translation_key = "vm_tools"
     _attr_device_class = BinarySensorDeviceClass.RUNNING
     _attr_entity_category = EntityCategory.DIAGNOSTIC
 
     def __init__(self, link: AgentLink, item: dict[str, Any]) -> None:
         """Set the identity."""
         super().__init__(link, SECTION_VMS, item, "tools")
+        self._attr_translation_key = "vm_guest_agent" if link.is_proxmox else "vm_tools"
 
     @property
     def is_on(self) -> bool:

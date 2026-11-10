@@ -1,12 +1,15 @@
 # Status
 
-Version 0.4.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
+Version 0.5.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
 - Integration: config flow, entities, scenario wizard, actions, EN and PL translations, diagnostics.
 - Agent packaged as .deb (amd64, arm64) with a systemd service and a CLI for MQTT, vCenter and ESXi connections.
 - Automatic Hypervisor sidebar panel (frontend/panel.js plus the ha_hypervisor/dashboard websocket command).
+- Proxmox VE 9 agent (pve.py, pve_operations.py): one node, cluster, cluster with HA. HA guests stop through the HA
+  manager and HA resources are started again after quorum. CLI proxmox set and node add. Tested against a simulated
+  Proxmox API (tests/agent/fake_pve.py), also end to end over HTTPS with Wake on LAN.
 - Repairs after every start: agent not answering within a minute, agent older than the integration.
 - Tests in Docker on the real Home Assistant 2026.11 image, hassfest, end-to-end stack with `vcsim`.
 
@@ -18,20 +21,16 @@ Version 0.4.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
 
 ## Next
 1. On the Supermicro: add the BMC to host 172.16.2.20, then a shutdown preview, then a real cycle.
-2. Proxmox VE and mixed scenarios, only after step 1 passes. See the plan below.
-3. Possible additions: disk and network statistics through PerformanceManager, BMC sensors (power draw, temperature).
+2. Proxmox on the real node: proxmox set, node add, node test, then preview, shutdown, start.
+3. Mixed scenarios across DCs, see the plan below.
+4. Possible additions: disk and network statistics through PerformanceManager, BMC sensors (power draw, temperature).
 
-## Plan: Proxmox and mixed mode (agreed, starts after the test of 0.3.0 on the Supermicro server)
+## Plan: mixed mode (Proxmox itself is done in 0.5.0)
 
 - One agent is one DC, one platform per DC. DCs are in separate networks, each agent must see its own BMCs. Each DC is
   a separate config entry in Home Assistant, which already works.
-- Agent: add `platform: vmware | proxmox` to the configuration. Proxmox is a driver next to the VMware code. BMC, MQTT,
-  signing and per-DC scenarios stay shared. Each DC can have several servers.
-- CLI: `init --platform proxmox`, `proxmox set --host ... --token-id ...`, `proxmox node add NAME --bmc-address ...`.
-- Proxmox specifics: API on every node, VMs and LXC, QEMU Guest Agent or ACPI for clean shutdown, stop Proxmox HA
-  services before shutdown so guests are not moved, watch quorum while nodes go down. Verify against current API docs.
 - Mixed scenario (new, in Home Assistant): an ordered list of existing per-DC scenarios. HA starts one, waits for its
   operation to finish, then starts the next; stops in reverse. Own state, buttons and action. If HA or the broker fails
   midway, the running DC scenario is finished by its agent, the next does not start, and HA reports an error.
 - All-DC shutdown: an action sending the command to every agent, with the same arming as for one cluster.
-- Ask the user first: Proxmox version, number of nodes, whether it is a cluster, whether Proxmox HA is used.
+- The user's Proxmox: VE 9, a single node homelab; the code must keep working for clusters with and without HA.

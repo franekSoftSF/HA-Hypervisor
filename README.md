@@ -1,7 +1,8 @@
 # HA Hypervisor
 
-Home Assistant control of a vCenter lab that Home Assistant cannot reach directly: statistics, VM power,
-cluster shutdown and start, and start scenarios. Currently supports VMware vSphere. Polish version: [README.pl.md](README.pl.md).
+Home Assistant control of a hypervisor lab that Home Assistant cannot reach directly: statistics, VM power,
+cluster shutdown and start, and start scenarios. Supports VMware vSphere and Proxmox VE 9 (one node, a cluster, a
+cluster with HA), one agent per platform. Polish version: [README.pl.md](README.pl.md).
 
 **[Installation guide](docs/installation.md)**
 
@@ -12,8 +13,8 @@ and host names are generated.*
 
 ```
 Home Assistant + this integration  <->  Mosquitto  <--MQTT over TLS--  agent
-                                                                         |-- vCenter API
-                                                                         |-- ESXi API
+                                                                         |-- vCenter and ESXi API, or
+                                                                         |-- Proxmox VE API (8006)
                                                                          '-- BMC (Redfish, IPMI), Wake on LAN
 ```
 

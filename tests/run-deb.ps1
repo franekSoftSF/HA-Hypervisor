@@ -10,7 +10,7 @@ New-Item -ItemType Directory -Force $dist | Out-Null
 docker run --rm -v "${root}:/src:ro" -v "${dist}:/out" python:3.14-slim sh /src/packaging/deb/build.sh
 if ($LASTEXITCODE -ne 0) { Write-Host 'BUILD FAILED'; exit 1 }
 
-docker compose -f $compose up -d --build mosquitto vcsim esxi 2>&1 | Out-Null
+docker compose -f $compose up -d --build mosquitto vcsim esxi pve 2>&1 | Out-Null
 Start-Sleep -Seconds 3
 
 foreach ($image in 'debian:12', 'debian:13', 'ubuntu:24.04') {

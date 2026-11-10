@@ -117,6 +117,46 @@ needs it to stop and start the vCenter VM and to shut down the host, at moments 
 
 With lockdown mode enabled, add the account to **Exception Users**.
 
+## 3b. Proxmox VE instead of vSphere
+
+One agent drives one platform. For Proxmox VE (version 9, tested against a simulator of its API) the agent talks to
+the API of each node on port 8006 with an API token. It works the same on a single node, on a cluster without HA and
+on a cluster with HA:
+
+| Setup | What the agent does on shutdown and start |
+|---|---|
+| Single node | Stops the guests, shuts the node down. Start: wakes it, waits for its API |
+| Cluster without HA | The same for every node, then waits for quorum on start |
+| Cluster with HA | HA guests are stopped through the HA manager (their requested state becomes `stopped`), so none is fenced or moved while the nodes go down. On start, after quorum, the HA resources that ran before are set to `started` again |
+
+Guests are QEMU VMs and LXC containers, templates are skipped. A clean shutdown uses the QEMU guest agent when it is
+installed, ACPI otherwise. For a scenario that waits for **tools**, a VM needs the guest agent (`qemu-guest-agent`
+inside, **QEMU Guest Agent** enabled in the VM options). Containers count as ready once running.
+
+The agent refuses to shut a cluster down without quorum, because Proxmox would refuse to stop the guests halfway. When
+a scenario stops and "power off empty hosts" is on, it keeps enough nodes on for quorum.
+
+Create a user, a role and a token on any node (in a cluster once, it is shared):
+
+```bash
+pveum role add HAHypervisor -privs "VM.Audit VM.PowerMgmt VM.GuestAgent.Audit Sys.Audit Sys.PowerMgmt Sys.Console Datastore.Audit"
+```
+
+```bash
+pveum user add ha-hypervisor@pve
+```
+
+```bash
+pveum acl modify / -user ha-hypervisor@pve -role HAHypervisor
+```
+
+```bash
+pveum user token add ha-hypervisor@pve agent --privsep 0
+```
+
+The last command prints the token secret once. `Sys.PowerMgmt` shuts nodes down, `Sys.Console` changes HA resource
+states, `VM.GuestAgent.Audit` reads guest IP addresses (Proxmox VE 9 replaced `VM.Monitor` with it).
+
 ## 4. Server power control
 
 Starting the cluster needs a way to power on a host that is completely off.
@@ -141,7 +181,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.4.0
+VERSION=0.5.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -188,6 +228,25 @@ sudo ha-hypervisor-agent esxi add esxi01.lab.local --username svc-ha --bmc-addre
 sudo ha-hypervisor-agent esxi test
 ```
 
+**For Proxmox VE** use these instead of `vcenter set` and `esxi add`. The node name is the one shown in Proxmox; add
+every node of the cluster with its BMC:
+
+```bash
+sudo ha-hypervisor-agent proxmox set --token-id 'ha-hypervisor@pve!agent'
+```
+
+```bash
+sudo ha-hypervisor-agent node add pve --address 192.168.1.50 --bmc-address 192.168.1.51 --bmc-username ADMIN
+```
+
+```bash
+sudo ha-hypervisor-agent node test
+```
+
+`node test` shows the version, single node or cluster with quorum, the number of guests and HA resources, and nodes
+that are not added yet. A second platform needs a second agent with its own `--config` and agent ID; both can run on
+the same machine.
+
 Passwords are asked for interactively and never passed as arguments. Then test everything together and start:
 
 ```bash
@@ -217,6 +276,8 @@ is left. The log should say `Connected to the broker`.
 | `vcenter set`, `vcenter test` | vCenter connection |
 | `esxi add NAME`, `esxi add NAME --update` | Add or change a host |
 | `esxi list`, `esxi remove NAME`, `esxi test [NAME]` | Manage and test hosts |
+| `proxmox set`, `proxmox test` | Proxmox VE API token, this makes the agent a Proxmox agent |
+| `node add NAME`, `node list`, `node remove NAME`, `node test [NAME]` | Proxmox nodes, with the same BMC and Wake on LAN options |
 
 Each command has `--help`. Options of `esxi add` include `--address`, `--bmc-type`, `--wol-mac`, `--wol-broadcast`,
 `--no-bmc` and `--no-wol`.

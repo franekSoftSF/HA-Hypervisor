@@ -80,7 +80,9 @@
       "agent_online": { "name": "Agent" },
       "host_connected": { "name": "Connection" },
       "vcenter_reachable": { "name": "vCenter" },
-      "vm_tools": { "name": "VMware Tools" }
+      "proxmox_reachable": { "name": "Proxmox API" },
+      "vm_tools": { "name": "VMware Tools" },
+      "vm_guest_agent": { "name": "Guest agent" }
     },
     "button": {
       "cancel_operation": { "name": "Cancel operation" },
@@ -137,7 +139,9 @@
           "wait_vcenter": "Waiting for vCenter",
           "retreat_off": "Enabling cluster services",
           "start_vms": "Starting VMs",
-          "stop_empty_hosts": "Stopping empty hosts"
+          "stop_empty_hosts": "Stopping empty hosts",
+          "wait_quorum": "Waiting for cluster quorum",
+          "restore_ha": "Starting HA resources again"
         }
       },
       "scenario_state": {
@@ -205,8 +209,11 @@
     "agent_vm_unreachable": { "message": "The VM is not reachable, its host may be off. Use a scenario to start it." },
     "agent_vm_stop_timeout": { "message": "A VM did not stop in time." },
     "agent_vm_start_timeout": { "message": "A VM did not start in time." },
-    "agent_tools_unavailable": { "message": "VMware Tools are not running in this VM. Use Force power off." },
-    "agent_vsphere_error": { "message": "vSphere returned an error, see the agent log." }
+    "agent_tools_unavailable": { "message": "The guest tools (VMware Tools or QEMU guest agent) are not running in this VM. Use Force power off." },
+    "agent_vsphere_error": { "message": "vSphere returned an error, see the agent log." },
+    "agent_proxmox_unavailable": { "message": "The Proxmox API does not answer." },
+    "agent_proxmox_error": { "message": "Proxmox returned an error, see the agent log." },
+    "agent_quorum_timeout": { "message": "The Proxmox cluster did not reach quorum in time." }
   },
   "services": {
     "start_scenario": {

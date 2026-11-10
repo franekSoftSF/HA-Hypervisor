@@ -32,6 +32,7 @@ from .protocol import (
     LEAF_RESULT,
     LEAF_STATE,
     LEAF_STATUS,
+    PLATFORM_PROXMOX,
     PROTOCOL_VERSION,
     STATUS_OFFLINE,
     STATUS_ONLINE,
@@ -41,6 +42,9 @@ from .protocol import (
     topic,
     unseal,
 )
+from .errors import GuestNotFound
+from .pve import PveInfra, build_pve_view
+from .pve_operations import ProxmoxOrchestrator
 from .store import Store
 from .vim import Infra, VimError, VimUnavailable
 
@@ -128,9 +132,16 @@ class AgentService:
     def __init__(self, config: AgentConfig) -> None:
         """Prepare the MQTT client, nothing connects yet."""
         self._config = config
-        self._infra = Infra(config)
         self._store = Store(config.state_file)
-        self._orchestrator = Orchestrator(
+        if config.platform == PLATFORM_PROXMOX:
+            self._infra: Any = PveInfra(config)
+            self._build_view: Any = build_pve_view
+            orchestrator: type[Orchestrator] = ProxmoxOrchestrator
+        else:
+            self._infra = Infra(config)
+            self._build_view = build_view
+            orchestrator = Orchestrator
+        self._orchestrator = orchestrator(
             config, self._infra, self._store, self._publish_operation
         )
         self._guard = ReplayGuard()
@@ -182,6 +193,7 @@ class AgentService:
                 "agent_version": __version__,
                 "protocol": PROTOCOL_VERSION,
                 "agent_id": self._config.agent_id,
+                "platform": self._config.platform,
             },
             retain=True,
         )
@@ -252,10 +264,10 @@ class AgentService:
 
     def _poll(self) -> None:
         try:
-            view = build_view(self._config, self._infra)
+            view = self._build_view(self._config, self._infra)
             remember(view, self._config, self._store)
             state = build_state(self._config, self._infra, self._store, view)
-        except (VimError, VimUnavailable) as err:
+        except (VimError, VimUnavailable, GuestNotFound) as err:
             _LOGGER.warning("Poll failed: %s", err)
             return
         except Exception:
@@ -267,7 +279,7 @@ class AgentService:
         """Connect and poll until stop() is called."""
         settings = self._config.mqtt
         if not self._config.configured:
-            _LOGGER.warning("vCenter or ESXi hosts are not configured yet, "
+            _LOGGER.warning("The hypervisor API or the hosts are not configured yet, "
                             "only Home Assistant is connected")
         _LOGGER.info("Connecting to %s:%s", settings.host, settings.port)
         self._client.connect_async(settings.host, settings.port, keepalive=30)
@@ -300,9 +312,57 @@ class AgentService:
         self._infra.close()
 
 
+def _check_power(infra: Any, host: Any) -> int:
+    """Print the power line of a host, return 1 when it cannot be woken."""
+    power = infra.power(host)
+    state = power.state()
+    methods = ", ".join(method.name for method in power.methods) or "none"
+    if power.verified():
+        print(f"OK    Power {host.name}: {state} (methods: {methods})")  # noqa: T201
+        return 0
+    if power.can_wake():
+        print(f"WARN  Power {host.name}: only Wake on LAN is left, it cannot be checked")  # noqa: T201
+        return 0
+    print(f"FAIL  Power {host.name}: no working method ({methods})")  # noqa: T201
+    return 1
+
+
+def _check_proxmox(config: AgentConfig) -> int:
+    from .pve import PveInfra, cluster_quorate  # noqa: PLC0415
+
+    infra = PveInfra(config)
+    failures = 0
+    if config.proxmox is None:
+        failures += 1
+        print("MISSING Proxmox: run proxmox set")  # noqa: T201
+    for host in config.hosts:
+        try:
+            client = infra.node(host)
+            version = client.version()
+            status = client.cluster_status()
+            ha = client.ha_resources()
+        except (VimUnavailable, VimError) as err:
+            failures += 1
+            print(f"FAIL  Proxmox {host.name} ({host.address}): {err}")  # noqa: T201
+        else:
+            cluster = next((i for i in status if i.get("type") == "cluster"), None)
+            kind = f"cluster {cluster.get('name')}" if cluster else "single node"
+            quorum = "" if cluster is None else (
+                ", quorate" if cluster_quorate(status) else ", NO QUORUM"
+            )
+            print(  # noqa: T201
+                f"OK    Proxmox {host.name}: {version}, {kind}{quorum}, "
+                f"{len(ha)} HA resources"
+            )
+        failures += _check_power(infra, host)
+    if not config.hosts:
+        failures += 1
+        print("MISSING Proxmox nodes: run node add")  # noqa: T201
+    return failures
+
+
 def check(config: AgentConfig) -> int:
     """Read-only test of every connection, printing one line for each."""
-    infra = Infra(config)
     failures = 0
     problem = test_mqtt(config.mqtt, config.agent_id)
     if problem:
@@ -311,6 +371,11 @@ def check(config: AgentConfig) -> int:
     else:
         print(f"OK    MQTT {config.mqtt.host}")  # noqa: T201
 
+    if config.platform == PLATFORM_PROXMOX:
+        failures += _check_proxmox(config)
+        return 1 if failures else 0
+
+    infra = Infra(config)
     if config.vcenter is None:
         failures += 1
         print("MISSING vCenter: run vcenter set")  # noqa: T201
@@ -329,16 +394,7 @@ def check(config: AgentConfig) -> int:
         except VimUnavailable as err:
             failures += 1
             print(f"FAIL  ESXi {host.name}: {err}")  # noqa: T201
-        power = infra.power(host)
-        state = power.state()
-        methods = ", ".join(method.name for method in power.methods) or "none"
-        if power.verified():
-            print(f"OK    Power {host.name}: {state} (methods: {methods})")  # noqa: T201
-        elif power.can_wake():
-            print(f"WARN  Power {host.name}: only Wake on LAN is left, it cannot be checked")  # noqa: T201
-        else:
-            failures += 1
-            print(f"FAIL  Power {host.name}: no working method ({methods})")  # noqa: T201
+        failures += _check_power(infra, host)
     if not config.hosts:
         failures += 1
         print("MISSING ESXi hosts: run esxi add")  # noqa: T201

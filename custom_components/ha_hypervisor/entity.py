@@ -35,21 +35,21 @@ def item_device(link: AgentLink, section: str, item: dict[str, Any]) -> DeviceIn
         return DeviceInfo(
             identifiers=identifiers,
             name=item["name"],
-            manufacturer=item.get("vendor") or "VMware",
-            model=item.get("model") or "ESXi",
+            manufacturer=item.get("vendor") or link.vendor,
+            model=item.get("model") or ("Proxmox VE" if link.is_proxmox else "ESXi"),
             sw_version=item.get("version"),
         )
     if section == SECTION_VMS:
         return DeviceInfo(
             identifiers=identifiers,
             name=item["name"],
-            manufacturer="VMware",
+            manufacturer=link.vendor,
             model=item.get("guest_os") or "Virtual machine",
         )
     return DeviceInfo(
         identifiers=identifiers,
         name=item["name"],
-        manufacturer="VMware",
+        manufacturer=link.vendor,
         model=item.get("type") or "Datastore",
     )
 

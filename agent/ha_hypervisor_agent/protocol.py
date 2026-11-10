@@ -69,6 +69,10 @@ CLUSTER_DEGRADED = "degraded"
 CLUSTER_OFF = "off"
 CLUSTER_NOT_CONFIGURED = "not_configured"
 
+PLATFORM_VMWARE = "vmware"
+PLATFORM_PROXMOX = "proxmox"
+PLATFORMS = (PLATFORM_VMWARE, PLATFORM_PROXMOX)
+
 # Language-neutral step keys, translated in Home Assistant.
 STEPS = (
     "preflight",
@@ -83,6 +87,8 @@ STEPS = (
     "retreat_off",
     "start_vms",
     "stop_empty_hosts",
+    "wait_quorum",
+    "restore_ha",
 )
 
 # Language-neutral error codes, translated in Home Assistant.
@@ -112,6 +118,9 @@ ERROR_CODES = (
     "vm_start_timeout",
     "tools_unavailable",
     "vsphere_error",
+    "proxmox_unavailable",
+    "proxmox_error",
+    "quorum_timeout",
 )
 
 _AGENT_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")

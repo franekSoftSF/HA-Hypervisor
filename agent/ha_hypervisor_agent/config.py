@@ -11,11 +11,13 @@ from typing import Any, TypeVar
 
 import yaml
 
-from .protocol import is_valid_agent_id, is_valid_key
+from .protocol import PLATFORM_PROXMOX, PLATFORM_VMWARE, PLATFORMS, is_valid_agent_id, is_valid_key
 
 T = TypeVar("T")
 _ENV = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 _MAC = re.compile(r"^([0-9a-fA-F]{2}[:-]){5}[0-9a-fA-F]{2}$")
+
+PROXMOX_PORT = 8006
 
 DEFAULT_CONFIG = os.environ.get(
     "HA_HYPERVISOR_CONFIG", "/etc/ha-hypervisor-agent/config.yaml"
@@ -52,6 +54,15 @@ class VCenterConfig:
 
 
 @dataclass(frozen=True)
+class ProxmoxConfig:
+    # API token, for example ha-hypervisor@pve!agent. The same token works on
+    # every node of a cluster.
+    token_id: str
+    token_secret: str
+    verify_ssl: bool = False
+
+
+@dataclass(frozen=True)
 class BmcConfig:
     address: str
     username: str
@@ -69,11 +80,12 @@ class WolConfig:
 
 @dataclass(frozen=True)
 class HostConfig:
-    # Must equal the host name shown in vCenter.
+    # Must equal the host name shown in vCenter, or the Proxmox node name.
     name: str
     address: str
-    username: str
-    password: str
+    # ESXi login. Proxmox nodes use the token of the proxmox section.
+    username: str = ""
+    password: str = ""
     port: int = 443
     verify_ssl: bool = False
     bmc: BmcConfig | None = None
@@ -97,8 +109,10 @@ class AgentConfig:
     agent_id: str
     shared_key: str
     mqtt: MqttConfig
+    platform: str = PLATFORM_VMWARE
     # Both may come later: the agent reaches Home Assistant with MQTT alone.
     vcenter: VCenterConfig | None = None
+    proxmox: ProxmoxConfig | None = None
     hosts: tuple[HostConfig, ...] = ()
     protected_vms: tuple[str, ...] = ()
     force_after_timeout: bool = True
@@ -114,7 +128,9 @@ class AgentConfig:
 
     @property
     def configured(self) -> bool:
-        """Return True when vCenter and at least one host are set."""
+        """Return True when the management API and at least one host are set."""
+        if self.platform == PLATFORM_PROXMOX:
+            return self.proxmox is not None and bool(self.hosts)
         return self.vcenter is not None and bool(self.hosts)
 
     def host(self, name: str) -> HostConfig | None:
@@ -178,6 +194,8 @@ def parse(raw: Any) -> AgentConfig:
         where = f"hosts[{index}]"
         if not isinstance(item, dict):
             raise ConfigError(f"{where}: expected a mapping")
+        if data.get("platform") == PLATFORM_PROXMOX:
+            item = {"port": PROXMOX_PORT, **item}
         hosts.append(
             _build(
                 HostConfig,
@@ -196,6 +214,9 @@ def parse(raw: Any) -> AgentConfig:
         vcenter=_build(VCenterConfig, data["vcenter"], "vcenter")
         if data.get("vcenter")
         else None,
+        proxmox=_build(ProxmoxConfig, data["proxmox"], "proxmox")
+        if data.get("proxmox")
+        else None,
         hosts=tuple(hosts),
         protected_vms=tuple(data.get("protected_vms") or ()),
         timeouts=_build(Timeouts, data.get("timeouts") or {}, "timeouts"),
@@ -209,12 +230,16 @@ def _validate(config: AgentConfig) -> None:
         raise ConfigError("agent_id: use lowercase letters, digits, - and _")
     if not is_valid_key(config.shared_key):
         raise ConfigError("shared_key: too short, run the genkey command")
+    if config.platform not in PLATFORMS:
+        raise ConfigError(f"platform: use {' or '.join(PLATFORMS)}")
     _validate_mqtt(config.mqtt)
     names = [host.name for host in config.hosts]
     if len(set(names)) != len(names):
         raise ConfigError("hosts: names must be unique")
     for host in config.hosts:
         _validate_host(host)
+        if config.platform == PLATFORM_VMWARE and not host.username:
+            raise ConfigError(f"hosts.{host.name}: username is required for ESXi")
 
 
 def _validate_mqtt(settings: MqttConfig) -> None:
@@ -244,6 +269,11 @@ def build_mqtt(raw: Any) -> MqttConfig:
 def build_vcenter(raw: Any) -> VCenterConfig:
     """Validate the vcenter section alone."""
     return _build(VCenterConfig, raw, "vcenter")
+
+
+def build_proxmox(raw: Any) -> ProxmoxConfig:
+    """Validate the proxmox section alone."""
+    return _build(ProxmoxConfig, raw, "proxmox")
 
 
 def build_host(raw: Any) -> HostConfig:

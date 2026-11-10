@@ -254,6 +254,10 @@ def main() -> None:
     api("POST", f"/api/config/config_entries/entry/{entry_id}/reload")
     wait("cluster sensor back", lambda: state(cluster) in ("on", "degraded"), 30)
 
+    from driver_pve import proxmox  # noqa: PLC0415
+
+    proxmox()
+
     step("log check")
     log = session.get(f"{BASE}/api/error_log", timeout=30).text
     relevant = [

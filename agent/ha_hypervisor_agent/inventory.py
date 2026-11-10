@@ -16,6 +16,9 @@ _LOGGER = logging.getLogger(__name__)
 SOURCE_VCENTER = "vcenter"
 SOURCE_ESXI = "esxi"
 SOURCE_NONE = "none"
+SOURCE_PROXMOX = "proxmox"
+# Sources that see every host, also the ones that are down.
+FULL_SOURCES = (SOURCE_VCENTER, SOURCE_PROXMOX)
 
 
 @dataclass
@@ -29,6 +32,8 @@ class View:
     vms: dict[str, dict[str, Any]] = field(default_factory=dict)
     datastores: list[dict[str, Any]] = field(default_factory=list)
     clusters: list[dict[str, Any]] = field(default_factory=list)
+    # Proxmox: HA resource id -> requested state.
+    ha: dict[str, Any] = field(default_factory=dict)
     # The session able to control each VM.
     clients: dict[str, VimClient] = field(default_factory=dict)
 
@@ -80,8 +85,8 @@ def remember(view: View, config: AgentConfig, store: Store) -> None:
     if view.source == SOURCE_NONE:
         return
     known = store.get("vms")
-    if view.source == SOURCE_VCENTER:
-        # vCenter sees everything, anything it does not list is gone.
+    if view.source in FULL_SOURCES:
+        # vCenter and Proxmox see everything, anything they do not list is gone.
         known = {}
     known.update(view.vms)
     store.set("vms", known)
@@ -115,7 +120,7 @@ def cluster_state(config: AgentConfig, view: View) -> str:
     if not config.configured:
         return CLUSTER_NOT_CONFIGURED
     connected = {name for name, host in view.hosts.items() if host["connected"]}
-    if view.source == SOURCE_VCENTER and all(h.name in connected for h in config.hosts):
+    if view.source in FULL_SOURCES and all(h.name in connected for h in config.hosts):
         return CLUSTER_ON
     return CLUSTER_DEGRADED if connected else CLUSTER_OFF
 
@@ -152,7 +157,7 @@ def build_state(
     protected = set(config.protected_vms) | {config.vcenter_vm_name}
     for vm in vms.values():
         vm["system"] = is_system_vm(vm)
-        vm["protected"] = vm["name"] in protected
+        vm["protected"] = vm["name"] in protected or str(vm.get("vmid")) in protected
 
     scenarios = {}
     for scenario_id, scenario in store.get("active_scenarios").items():
@@ -165,10 +170,11 @@ def build_state(
         }
 
     return {
+        "platform": config.platform,
         "source": view.source,
         "cluster": cluster_state(config, view),
         "vcenter": {
-            "reachable": view.source == SOURCE_VCENTER,
+            "reachable": view.source in FULL_SOURCES,
             "version": view.vcenter_version,
         },
         "hosts": sorted(hosts.values(), key=lambda host: host["name"]),

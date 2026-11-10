@@ -12,6 +12,13 @@ from pyVim.connect import Disconnect, SmartConnect
 from pyVmomi import vim, vmodl
 
 from .config import AgentConfig, HostConfig
+from .errors import (
+    GuestNotFound,
+    PlatformAuthError,
+    PlatformError,
+    PlatformUnavailable,
+    ToolsUnavailable,
+)
 from .power import HostPower, tcp_open
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,24 +69,12 @@ _DATASTORE_PATHS = [
 ]
 
 
-class VimUnavailable(Exception):
-    """The endpoint cannot be reached or refused the login."""
-
-
-class VimAuthError(VimUnavailable):
-    """The endpoint refused the credentials."""
-
-
-class VimNotFound(Exception):
-    """The object does not exist on this endpoint."""
-
-
-class VimToolsUnavailable(Exception):
-    """A guest operation needs VMware Tools, which are not running."""
-
-
-class VimError(Exception):
-    """An API call failed."""
+# The vSphere names of the shared errors.
+VimUnavailable = PlatformUnavailable
+VimAuthError = PlatformAuthError
+VimNotFound = GuestNotFound
+VimToolsUnavailable = ToolsUnavailable
+VimError = PlatformError
 
 
 def _power(state: Any) -> str:

@@ -118,6 +118,45 @@ wyłączania i uruchamiania maszyny vCenter oraz wyłączania hosta, czyli wtedy
 
 Przy włączonym trybie lockdown dodaj konto do **Exception Users**.
 
+## 3b. Proxmox VE zamiast vSphere
+
+Jeden agent obsługuje jedną platformę. Z Proxmox VE (wersja 9, testowane na symulatorze jego API) agent rozmawia przez
+API każdego węzła na porcie 8006, z tokenem API. Działa tak samo na jednym węźle, w klastrze bez HA i w klastrze z HA:
+
+| Układ | Co agent robi przy wyłączaniu i starcie |
+|---|---|
+| Jeden węzeł | Zatrzymuje maszyny i kontenery, wyłącza węzeł. Start: budzi go i czeka na API |
+| Klaster bez HA | To samo dla każdego węzła, a przy starcie czeka na kworum |
+| Klaster z HA | Maszyny HA zatrzymuje przez menedżera HA (żądany stan `stopped`), więc żadna nie zostanie odgrodzona (fencing) ani przeniesiona, gdy węzły się wyłączają. Przy starcie, po uzyskaniu kworum, zasoby HA działające wcześniej dostają z powrotem stan `started` |
+
+Obsługiwane są maszyny QEMU i kontenery LXC, szablony są pomijane. Czyste wyłączenie używa agenta QEMU, jeśli jest
+zainstalowany, w przeciwnym razie ACPI. Scenariusz czekający na **narzędzia** wymaga w maszynie agenta gościa
+(`qemu-guest-agent` w systemie i włączone **QEMU Guest Agent** w opcjach maszyny). Kontener jest gotowy, gdy działa.
+
+Agent odmówi wyłączenia klastra bez kworum, bo Proxmox odmówiłby zatrzymania maszyn w połowie operacji. Gdy scenariusz
+się kończy z opcją wyłączania pustych hostów, agent zostawia włączone tyle węzłów, ile potrzeba do kworum.
+
+Utwórz użytkownika, rolę i token na dowolnym węźle (w klastrze raz, są wspólne):
+
+```bash
+pveum role add HAHypervisor -privs "VM.Audit VM.PowerMgmt VM.GuestAgent.Audit Sys.Audit Sys.PowerMgmt Sys.Console Datastore.Audit"
+```
+
+```bash
+pveum user add ha-hypervisor@pve
+```
+
+```bash
+pveum acl modify / -user ha-hypervisor@pve -role HAHypervisor
+```
+
+```bash
+pveum user token add ha-hypervisor@pve agent --privsep 0
+```
+
+Ostatnie polecenie raz pokazuje sekret tokenu. `Sys.PowerMgmt` wyłącza węzły, `Sys.Console` zmienia stan zasobów HA,
+`VM.GuestAgent.Audit` odczytuje adresy IP maszyn (w Proxmox VE 9 zastąpiło `VM.Monitor`).
+
 ## 4. Sterowanie zasilaniem serwera
 
 Uruchomienie klastra wymaga sposobu na włączenie całkowicie wyłączonego hosta.
@@ -142,7 +181,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.4.0
+VERSION=0.5.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -189,6 +228,25 @@ sudo ha-hypervisor-agent esxi add esxi01.lab.local --username svc-ha --bmc-addre
 sudo ha-hypervisor-agent esxi test
 ```
 
+**Dla Proxmox VE** zamiast `vcenter set` i `esxi add` użyj poniższych. Nazwa węzła to ta widoczna w Proxmox; dodaj każdy
+węzeł klastra razem z jego BMC:
+
+```bash
+sudo ha-hypervisor-agent proxmox set --token-id 'ha-hypervisor@pve!agent'
+```
+
+```bash
+sudo ha-hypervisor-agent node add pve --address 192.168.1.50 --bmc-address 192.168.1.51 --bmc-username ADMIN
+```
+
+```bash
+sudo ha-hypervisor-agent node test
+```
+
+`node test` pokazuje wersję, czy to jeden węzeł czy klaster z kworum, liczbę maszyn i zasobów HA oraz węzły, których
+jeszcze nie dodano. Druga platforma wymaga drugiego agenta z własnym `--config` i ID agenta; oba mogą działać na tej samej
+maszynie.
+
 O hasła polecenia pytają interaktywnie, nigdy nie podaje się ich jako argumentów. Potem sprawdź całość i uruchom:
 
 ```bash
@@ -218,6 +276,8 @@ którego nie da się sprawdzić. W logu powinien pojawić się wpis `Connected t
 | `vcenter set`, `vcenter test` | Połączenie z vCenter |
 | `esxi add NAZWA`, `esxi add NAZWA --update` | Dodaje lub zmienia host |
 | `esxi list`, `esxi remove NAZWA`, `esxi test [NAZWA]` | Lista, usuwanie i test hostów |
+| `proxmox set`, `proxmox test` | Token API Proxmox VE, od tej chwili agent obsługuje Proxmox |
+| `node add NAZWA`, `node list`, `node remove NAZWA`, `node test [NAZWA]` | Węzły Proxmox, z tymi samymi opcjami BMC i Wake on LAN |
 
 Każde polecenie ma `--help`. Opcje `esxi add` to m.in. `--address`, `--bmc-type`, `--wol-mac`, `--wol-broadcast`,
 `--no-bmc` i `--no-wol`.

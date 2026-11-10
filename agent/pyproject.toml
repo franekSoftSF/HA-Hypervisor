@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ha-hypervisor-agent"
-description = "Agent connecting vCenter, ESXi and server BMCs to Home Assistant over MQTT"
+description = "Agent connecting vSphere or Proxmox VE and server BMCs to Home Assistant over MQTT"
 requires-python = ">=3.12"
 dynamic = ["version"]
 dependencies = [

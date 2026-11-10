@@ -20,6 +20,7 @@ _DEFAULT: dict[str, Any] = {
     "vms": {},  # vm id -> last known VM record
     "vcenter_host": None,  # host that ran the vCenter VM
     "retreat_clusters": [],  # cluster ids we put into vCLS Retreat Mode
+    "ha_resources": [],  # Proxmox HA resources we stopped, started again on start
     "active_scenarios": {},  # scenario id -> {"name": str, "vms": [ids]}
     "operation": None,  # last operation
 }

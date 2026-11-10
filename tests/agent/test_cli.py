@@ -331,3 +331,110 @@ def test_esxi_test_reads_environment_secrets(path, monkeypatch, capsys):
     assert run(path, "esxi", "test") == 1  # no way to power it on
     assert seen["password"] == "real"
     assert "OK    ESXi h1" in capsys.readouterr().out
+
+
+# ------------------------------------------------------------------- proxmox
+
+
+@pytest.fixture
+def pve(path, stdin):
+    assert run(path, "init", "--agent-id", "homelab") == 0
+    assert run(path, "mqtt", "set", "--host", "broker", "--no-tls") == 0
+    stdin(SECRET)
+    assert run(path, "proxmox", "set", "--token-id", "ha-hypervisor@pve!agent", "--secret-stdin") == 0
+    stdin("bmc-secret")
+    assert (
+        run(
+            path, "node", "add", "pve", "--address", "172.16.3.10",
+            "--bmc-address", "172.16.3.11", "--bmc-username", "ADMIN", "--bmc-password-stdin",
+        )
+        == 0
+    )
+    return path
+
+
+def test_proxmox_setup_gives_a_valid_configuration(pve):
+    config = load(pve)
+    assert config.platform == "proxmox"
+    assert config.configured
+    assert config.proxmox.token_secret == SECRET
+    (node,) = config.hosts
+    assert (node.name, node.address, node.port) == ("pve", "172.16.3.10", 8006)
+    assert node.username == ""
+    assert node.bmc.password == "bmc-secret"
+
+
+def test_proxmox_show_hides_the_token_secret(pve, capsys):
+    capsys.readouterr()
+    run(pve, "show")
+    out = capsys.readouterr().out
+    assert SECRET not in out
+    assert "ha-hypervisor@pve!agent" in out
+    assert "Still missing" not in out
+
+
+def test_proxmox_token_id_format(path, stdin):
+    run(path, "init")
+    stdin(SECRET)
+    assert run(path, "proxmox", "set", "--token-id", "root@pam", "--secret-stdin") == cli.EXIT_CONFIG
+
+
+def test_node_add_needs_the_token_first(path):
+    run(path, "init")
+    assert run(path, "node", "add", "pve", "--wol-mac", "00:11:22:33:44:55") == cli.EXIT_CONFIG
+
+
+def test_one_agent_drives_one_platform(pve, tmp_path, stdin, capsys):
+    # A Proxmox agent refuses vSphere settings and the other way round.
+    assert run(pve, "vcenter", "set", "--host", "vc", "--username", "u", "--password-env", "X") == cli.EXIT_CONFIG
+    stdin(SECRET)
+    assert run(pve, "esxi", "add", "h", "--username", "r", "--password-stdin") == cli.EXIT_CONFIG
+    vmware = str(tmp_path / "vmware.yaml")
+    run(vmware, "init")
+    run(vmware, "vcenter", "set", "--host", "vc", "--username", "u", "--password-env", "X")
+    stdin(SECRET)
+    assert run(vmware, "proxmox", "set", "--token-id", "a@pve!b", "--secret-stdin") == cli.EXIT_CONFIG
+    assert "second agent" in capsys.readouterr().err
+
+
+def test_node_update_and_list(pve, capsys):
+    assert run(pve, "node", "add", "pve", "--update", "--port", "8443", "--wol-mac", "00:11:22:33:44:55") == 0
+    node = data(pve)["hosts"][0]
+    assert node["port"] == 8443
+    assert node["bmc"]["password"] == "bmc-secret"
+    capsys.readouterr()
+    run(pve, "node", "list")
+    out = capsys.readouterr().out
+    assert "pve" in out and "wol 00:11:22:33:44:55" in out
+
+
+def test_node_test_against_the_simulator(pve, monkeypatch, capsys):
+    from fake_pve import SECRET as PVE_SECRET, TOKEN, Cluster
+    from ha_hypervisor_agent.pve import ProxmoxClient
+
+    monkeypatch.setattr(ProxmoxClient, "SCHEME", "http")
+    cluster = Cluster(name="homelab")
+    node = cluster.add_node("pve")
+    cluster.add_node("pve2")
+    cluster.add_guest(100, "dc01", "pve", ha="started", running=True)
+    try:
+        settings = data(pve)
+        settings["proxmox"] = {"token_id": TOKEN, "token_secret": PVE_SECRET}
+        settings["hosts"][0].update(address="127.0.0.1", port=node.port)
+        with open(pve, "w", encoding="utf-8") as stream:
+            yaml.safe_dump(settings, stream)
+        monkeypatch.setattr(
+            "ha_hypervisor_agent.pve.PveInfra.power",
+            lambda _self, _host: SimpleNamespace(
+                methods=[SimpleNamespace(name="redfish")], verified=lambda: True,
+                can_wake=lambda: True, state=lambda: "on",
+            ),
+        )
+        capsys.readouterr()
+        assert run(pve, "node", "test") == 0
+        out = capsys.readouterr().out
+        assert "OK    Proxmox pve: 9.0.10, cluster homelab, quorate" in out
+        assert "1 guests, 1 HA resources" in out
+        assert "node pve2: NOT configured" in out
+    finally:
+        cluster.stop()

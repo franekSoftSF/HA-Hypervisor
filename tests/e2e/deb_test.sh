@@ -85,6 +85,19 @@ wait $AGENT
 test -s /var/lib/$NAME/state.json
 test "$(stat -c '%U' /var/lib/$NAME/state.json)" = "$NAME"
 
+echo "--- Proxmox VE agent next to it, own configuration (HTTPS with a self-signed certificate)"
+PVE=/etc/$NAME/pve.yaml
+$NAME init --agent-id pve --config $PVE >/dev/null
+$NAME mqtt set --host mosquitto --no-tls --config $PVE >/dev/null
+printf '0b6b0bf2-7a56-4c4b-9f0e-6f5e1f1c2b10\n' | $NAME proxmox set --token-id 'ha-hypervisor@pve!agent' --secret-stdin --config $PVE
+if printf 'pass\n' | $NAME vcenter set --host x --username u --password-stdin --config $PVE 2>/dev/null; then
+    echo "a Proxmox agent accepted vCenter"; exit 1
+fi
+$NAME node add pve --address pve --wol-mac 02:00:00:00:00:01 --wol-broadcast pve --config $PVE
+$NAME node test --config $PVE | tee /tmp/node.txt
+grep -q "OK    Proxmox pve: 9.0.10, single node" /tmp/node.txt
+$NAME check --config $PVE
+
 echo "--- upgrade keeps the configuration"
 dpkg -i "/debs/${NAME}_"*"_$(dpkg --print-architecture).deb" >/dev/null
 test "$($NAME key show)" = "$KEY"

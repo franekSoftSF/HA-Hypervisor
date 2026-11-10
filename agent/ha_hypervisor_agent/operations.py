@@ -11,7 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from .config import AgentConfig, HostConfig
-from .inventory import View, build_view, is_system_vm, remember
+from .inventory import FULL_SOURCES, View, build_view, is_system_vm, remember
 from .power import POWER_OFF, PowerError
 from .protocol import (
     CMD_CLUSTER_SHUTDOWN,
@@ -100,7 +100,9 @@ def validate_scenario(scenario: Any) -> dict[str, Any]:
 
 
 class Orchestrator:
-    """Runs one operation at a time."""
+    """Runs one operation at a time. This class drives vSphere."""
+
+    ERROR_CODE = "vsphere_error"
 
     def __init__(
         self,
@@ -114,6 +116,7 @@ class Orchestrator:
         self._infra = infra
         self._store = store
         self._on_update = on_update
+        self._build_view = build_view
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
         self._cancel = threading.Event()
@@ -219,7 +222,7 @@ class Orchestrator:
         except (VimError, VimUnavailable, VimNotFound) as err:
             _LOGGER.error("Operation failed: %s", err)  # noqa: TRY400
             status = OP_FAILED
-            self._op.update(error_code="vsphere_error", error=str(err))
+            self._op.update(error_code=self.ERROR_CODE, error=str(err))
         except Exception as err:
             _LOGGER.exception("Operation crashed")
             status = OP_FAILED
@@ -255,7 +258,7 @@ class Orchestrator:
             raise OperationFailed("esxi_unavailable", str(err)) from err
 
     def _view(self) -> View:
-        view = build_view(self._config, self._infra)
+        view = self._build_view(self._config, self._infra)
         remember(view, self._config, self._store)
         return view
 
@@ -322,7 +325,8 @@ class Orchestrator:
         }
 
     def _is_protected(self, vm: dict[str, Any]) -> bool:
-        return vm["name"] in self._config.protected_vms
+        protected = self._config.protected_vms
+        return vm["name"] in protected or str(vm.get("vmid")) in protected
 
     def _cluster_shutdown(self, body: dict[str, Any]) -> None:
         assert self._op is not None  # noqa: S101
@@ -544,7 +548,7 @@ class Orchestrator:
         self._step("preflight", scenario["name"])
         known = self._store.get("vms")
         view = self._view()
-        if view.source != "vcenter":
+        if view.source not in FULL_SOURCES:
             placement = [known.get(vm, {}).get("host") for vm in wanted]
             if all(placement):
                 hosts = sorted(set(placement))
@@ -648,12 +652,14 @@ class Orchestrator:
             raise OperationFailed("invalid_request", action)
         if self.busy:
             raise Busy
-        view = build_view(self._config, self._infra)
+        view = self._build_view(self._config, self._infra)
         vm = view.vms.get(vm_id)
         if vm is None:
             raise OperationFailed("vm_unreachable", vm_id)
-        protected = set(self._config.protected_vms) | {self._config.vcenter_vm_name}
-        if action != VM_ACTION_ON and (vm["name"] in protected or is_system_vm(vm)):
+        is_vcenter = vm["name"] == self._config.vcenter_vm_name
+        if action != VM_ACTION_ON and (
+            self._is_protected(vm) or is_vcenter or is_system_vm(vm)
+        ):
             raise OperationFailed("vm_protected", vm["name"])
 
         client = view.clients[vm_id]
@@ -671,4 +677,4 @@ class Orchestrator:
         except VimNotFound as err:
             raise OperationFailed("vm_not_found", vm["name"]) from err
         except (VimError, VimUnavailable) as err:
-            raise OperationFailed("vsphere_error", str(err)) from err
+            raise OperationFailed(self.ERROR_CODE, str(err)) from err

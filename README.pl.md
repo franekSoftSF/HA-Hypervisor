@@ -1,7 +1,8 @@
 # HA Hypervisor
 
-Sterowanie laboratorium vCenter z Home Assistanta, gdy HA nie ma do niego bezpośredniego dostępu: statystyki,
-zasilanie maszyn, wyłączanie i uruchamianie klastra oraz scenariusze startu. Obecnie obsługuje VMware vSphere. Wersja angielska: [README.md](README.md).
+Sterowanie laboratorium wirtualizacji z Home Assistanta, gdy HA nie ma do niego bezpośredniego dostępu: statystyki,
+zasilanie maszyn, wyłączanie i uruchamianie klastra oraz scenariusze startu. Obsługuje VMware vSphere i Proxmox VE 9
+(jeden węzeł, klaster, klaster z HA), jeden agent na platformę. Wersja angielska: [README.md](README.md).
 
 **[Instrukcja instalacji](docs/pl/installation.md)**
 
@@ -12,8 +13,8 @@ niska, a nazwy hostów są wygenerowane.*
 
 ```
 Home Assistant + ta integracja  <->  Mosquitto  <--MQTT po TLS--  agent
-                                                                    |-- API vCenter
-                                                                    |-- API ESXi
+                                                                    |-- API vCenter i ESXi, albo
+                                                                    |-- API Proxmox VE (8006)
                                                                     '-- BMC (Redfish, IPMI), Wake on LAN
 ```
 

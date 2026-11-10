@@ -31,6 +31,7 @@ from .protocol import (
     LEAF_STATE,
     LEAF_STATUS,
     OP_RUNNING,
+    PLATFORM_PROXMOX,
     STATUS_ONLINE,
     Envelope,
     ProtocolError,
@@ -220,6 +221,16 @@ class AgentLink:
         # A listener can add entities, which register new listeners.
         for listener in list(self._listeners):
             listener()
+
+    @property
+    def is_proxmox(self) -> bool:
+        """Return True when the agent drives Proxmox VE."""
+        return (self.state or {}).get("platform") == PLATFORM_PROXMOX
+
+    @property
+    def vendor(self) -> str:
+        """Return the name shown as manufacturer of VMs and datastores."""
+        return "Proxmox" if self.is_proxmox else "VMware"
 
     def items(self, section: str) -> list[dict[str, Any]]:
         """Return the hosts, vms or datastores list."""

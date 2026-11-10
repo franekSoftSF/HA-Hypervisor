@@ -80,7 +80,9 @@
       "agent_online": { "name": "Agent" },
       "host_connected": { "name": "Połączenie" },
       "vcenter_reachable": { "name": "vCenter" },
-      "vm_tools": { "name": "VMware Tools" }
+      "proxmox_reachable": { "name": "API Proxmox" },
+      "vm_tools": { "name": "VMware Tools" },
+      "vm_guest_agent": { "name": "Agent gościa" }
     },
     "button": {
       "cancel_operation": { "name": "Anuluj operację" },
@@ -137,7 +139,9 @@
           "wait_vcenter": "Oczekiwanie na vCenter",
           "retreat_off": "Włączanie usług klastra",
           "start_vms": "Uruchamianie maszyn",
-          "stop_empty_hosts": "Wyłączanie pustych hostów"
+          "stop_empty_hosts": "Wyłączanie pustych hostów",
+          "wait_quorum": "Oczekiwanie na kworum klastra",
+          "restore_ha": "Ponowne uruchamianie zasobów HA"
         }
       },
       "scenario_state": {
@@ -205,8 +209,11 @@
     "agent_vm_unreachable": { "message": "Maszyna jest niedostępna, jej host może być wyłączony. Uruchom ją scenariuszem." },
     "agent_vm_stop_timeout": { "message": "Maszyna nie wyłączyła się na czas." },
     "agent_vm_start_timeout": { "message": "Maszyna nie uruchomiła się na czas." },
-    "agent_tools_unavailable": { "message": "W tej maszynie nie działa VMware Tools. Użyj Wymuś wyłączenie." },
-    "agent_vsphere_error": { "message": "vSphere zwrócił błąd, sprawdź log agenta." }
+    "agent_tools_unavailable": { "message": "W tej maszynie nie działają narzędzia gościa (VMware Tools lub agent QEMU). Użyj Wymuś wyłączenie." },
+    "agent_vsphere_error": { "message": "vSphere zwrócił błąd, sprawdź log agenta." },
+    "agent_proxmox_unavailable": { "message": "API Proxmox nie odpowiada." },
+    "agent_proxmox_error": { "message": "Proxmox zwrócił błąd, sprawdź log agenta." },
+    "agent_quorum_timeout": { "message": "Klaster Proxmox nie uzyskał kworum na czas." }
   },
   "services": {
     "start_scenario": {

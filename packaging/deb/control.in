@@ -11,6 +11,6 @@ Homepage: https://github.com/franekSoftSF/HA-Hypervisor
 Description: Agent connecting hypervisors and server BMCs to Home Assistant
  Runs outside the managed cluster and talks to Home Assistant over MQTT.
  Collects statistics, controls virtual machines, and shuts down and powers on
- whole clusters through vCenter, ESXi and the server BMC.
+ whole clusters through vCenter and ESXi or Proxmox VE, and the server BMC.
  .
  Includes its own Python runtime in /opt/ha-hypervisor-agent.
