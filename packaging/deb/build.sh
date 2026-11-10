@@ -43,6 +43,7 @@ mkdir -p "$ROOT/opt" "$ROOT/usr/bin" "$ROOT/usr/lib/systemd/system" "$ROOT/usr/s
 cp -a "$PREFIX" "$ROOT/opt/"
 ln -s "$PREFIX/python/bin/$NAME" "$ROOT/usr/bin/$NAME"
 install -m 0644 "$SRC/packaging/deb/$NAME.service" "$ROOT/usr/lib/systemd/system/$NAME.service"
+install -m 0644 "$SRC/packaging/deb/$NAME@.service" "$ROOT/usr/lib/systemd/system/$NAME@.service"
 install -m 0644 "$SRC/packaging/deb/copyright" "$ROOT/usr/share/doc/$NAME/copyright"
 install -m 0644 "$SRC/agent/config.example.yaml" "$ROOT/usr/share/doc/$NAME/config.example.yaml"
 for script in postinst prerm postrm; do

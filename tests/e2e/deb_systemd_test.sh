@@ -27,10 +27,25 @@ journalctl -u $NAME --no-pager -n 20 | grep -q "Connected to the broker"
 test -s /var/lib/$NAME/state.json
 systemd-analyze security --no-pager $NAME | tail -1
 
+echo "--- second agent next to it: Proxmox, ha-hypervisor-agent@pve"
+$NAME init --agent-id systemdpve --instance pve | grep -q "ha-hypervisor-agent@pve"
+$NAME mqtt set --host mosquitto --no-tls --instance pve | grep -q "enable --now ha-hypervisor-agent@pve"
+printf '0b6b0bf2-7a56-4c4b-9f0e-6f5e1f1c2b10\n' | $NAME proxmox set --token-id 'ha-hypervisor@pve!agent' --secret-stdin --instance pve >/dev/null
+$NAME node add pve --address pve --wol-mac 02:00:00:00:00:01 --instance pve >/dev/null
+systemctl enable --now $NAME@pve
+sleep 8
+test "$(systemctl is-active $NAME@pve)" = "active"
+test "$(systemctl is-active $NAME)" = "active"
+journalctl -u $NAME@pve --no-pager -n 30 | grep -q "Connected to the broker"
+test -s /var/lib/$NAME/pve.state.json
+test -s /var/lib/$NAME/state.json
+
 echo "--- stop reports offline, removal stops the service"
 systemctl stop $NAME
 apt-get remove -y -qq $NAME >/dev/null
 test "$(systemctl is-enabled $NAME 2>&1 || true)" != "enabled"
+test "$(systemctl is-active $NAME@pve || true)" != "active"
+test "$(systemctl is-enabled $NAME@pve 2>&1 || true)" != "enabled"
 test -e /etc/$NAME/config.yaml
 
 echo "SYSTEMD TEST PASSED"

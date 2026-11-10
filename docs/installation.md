@@ -181,7 +181,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.5.0
+VERSION=0.5.1
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -244,8 +244,35 @@ sudo ha-hypervisor-agent node test
 ```
 
 `node test` shows the version, single node or cluster with quorum, the number of guests and HA resources, and nodes
-that are not added yet. A second platform needs a second agent with its own `--config` and agent ID; both can run on
-the same machine.
+that are not added yet.
+
+**vSphere and Proxmox from one machine.** One agent drives one platform; a second one runs next to it as the service
+`ha-hypervisor-agent@NAME` with its own file `/etc/ha-hypervisor-agent/NAME.yaml`, its own state and its own agent ID.
+Add `--instance NAME` to every command for it:
+
+```bash
+sudo ha-hypervisor-agent init --agent-id proxmox --instance pve
+```
+
+```bash
+sudo ha-hypervisor-agent mqtt set --host 192.168.1.240 --port 1883 --instance pve
+```
+
+```bash
+sudo ha-hypervisor-agent proxmox set --token-id 'ha-hypervisor@pve!agent' --instance pve
+```
+
+```bash
+sudo ha-hypervisor-agent node add pve --address 192.168.1.50 --wol-mac AA:BB:CC:DD:EE:FF --instance pve
+```
+
+```bash
+sudo systemctl enable --now ha-hypervisor-agent@pve
+```
+
+In Home Assistant add the integration a second time with the ID and key printed by `init`. Each agent is a separate
+entry and both appear in the Hypervisor panel. Secrets for `--password-env` references of this agent go to
+`/etc/ha-hypervisor-agent/pve.env`.
 
 Passwords are asked for interactively and never passed as arguments. Then test everything together and start:
 
@@ -278,6 +305,7 @@ is left. The log should say `Connected to the broker`.
 | `esxi list`, `esxi remove NAME`, `esxi test [NAME]` | Manage and test hosts |
 | `proxmox set`, `proxmox test` | Proxmox VE API token, this makes the agent a Proxmox agent |
 | `node add NAME`, `node list`, `node remove NAME`, `node test [NAME]` | Proxmox nodes, with the same BMC and Wake on LAN options |
+| `--instance NAME` (with any command) | A further agent on the same machine, service `ha-hypervisor-agent@NAME` |
 
 Each command has `--help`. Options of `esxi add` include `--address`, `--bmc-type`, `--wol-mac`, `--wol-broadcast`,
 `--no-bmc` and `--no-wol`.

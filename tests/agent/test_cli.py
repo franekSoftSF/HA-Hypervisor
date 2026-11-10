@@ -438,3 +438,45 @@ def test_node_test_against_the_simulator(pve, monkeypatch, capsys):
         assert "node pve2: NOT configured" in out
     finally:
         cluster.stop()
+
+
+# ------------------------------------------------------- a further agent
+
+
+@pytest.fixture
+def etc(tmp_path, monkeypatch):
+    folder = tmp_path / "etc"
+    monkeypatch.setattr(cli, "DEFAULT_CONFIG", str(folder / "config.yaml"))
+    monkeypatch.setattr(cli, "PACKAGE_STATE_FILE", str(tmp_path / "lib" / "state.json"))
+    return folder
+
+
+def test_instance_has_its_own_file_state_and_service(etc, tmp_path, monkeypatch, capsys):
+    assert cli.main(["init", "--agent-id", "lab"]) == 0
+    assert cli.main(["init", "--agent-id", "pve", "--instance", "pve"]) == 0
+    out = capsys.readouterr().out
+    assert "--instance pve" in out and "ha-hypervisor-agent@pve" in out
+
+    main = yaml.safe_load((etc / "config.yaml").read_text())
+    pve = yaml.safe_load((etc / "pve.yaml").read_text())
+    assert main["agent_id"] == "lab" and pve["agent_id"] == "pve"
+    assert main["state_file"] == str(tmp_path / "lib" / "state.json")
+    assert pve["state_file"] == str(tmp_path / "lib" / "pve.state.json")
+
+    # The reminder names the unit of this configuration.
+    monkeypatch.setattr(cli, "_service_state", lambda: "inactive")
+    cli.main(["mqtt", "set", "--host", "b", "--no-tls", "--instance", "pve"])
+    assert "sudo systemctl enable --now ha-hypervisor-agent@pve" in capsys.readouterr().out
+    assert yaml.safe_load((etc / "pve.yaml").read_text())["mqtt"]["host"] == "b"
+    assert "mqtt" not in yaml.safe_load((etc / "config.yaml").read_text())
+
+    monkeypatch.setattr(cli, "_service_state", lambda: "active")
+    cli.main(["mqtt", "set", "--host", "c", "--no-tls"])
+    out = capsys.readouterr().out
+    assert "sudo systemctl restart ha-hypervisor-agent\n" in out + "\n"
+    assert "@" not in out
+
+
+def test_instance_name_is_checked(etc):
+    with pytest.raises(SystemExit):
+        cli.main(["show", "--instance", "../etc"])

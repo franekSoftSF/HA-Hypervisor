@@ -15,7 +15,8 @@ if [ "$1" = "configure" ]; then
         # Enabled but not started: it needs a configuration first.
         systemctl enable "$NAME.service" >/dev/null 2>&1 || true
         if [ -n "${2:-}" ]; then
-            systemctl try-restart "$NAME.service" || true
+            # Also further agents such as ha-hypervisor-agent@pve.
+            systemctl try-restart "$NAME.service" "$NAME@*.service" || true
         fi
     fi
 fi

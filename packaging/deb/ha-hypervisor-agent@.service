@@ -1,0 +1,33 @@
+[Unit]
+Description=HA Hypervisor agent %i
+Documentation=https://github.com/franekSoftSF/HA-Hypervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=ha-hypervisor-agent
+Group=ha-hypervisor-agent
+# One more agent next to the main one, for example ha-hypervisor-agent@pve with
+# /etc/ha-hypervisor-agent/pve.yaml. Optional: values for --password-env references.
+EnvironmentFile=-/etc/ha-hypervisor-agent/%i.env
+ExecStart=/usr/bin/ha-hypervisor-agent run --instance %i
+Restart=always
+RestartSec=10
+# 2 means the configuration is not usable: restarting would not help.
+RestartPreventExitStatus=2
+StateDirectory=ha-hypervisor-agent
+StateDirectoryMode=0750
+
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

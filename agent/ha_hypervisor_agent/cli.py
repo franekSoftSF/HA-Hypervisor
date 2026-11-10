@@ -36,6 +36,10 @@ from .vim import VimClient, VimError, VimUnavailable
 
 _GROUP = "ha-hypervisor-agent"
 _SERVICE = "ha-hypervisor-agent"
+_INSTANCE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+# The systemd unit of the configuration being edited, set by main().
+_unit = _SERVICE
+_instance: str | None = None
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _HIDDEN = "********"
 _SECRET_KEYS = ("password", "shared_key", "token_secret")
@@ -158,7 +162,7 @@ def _service_state() -> str | None:
     if not Path("/run/systemd/system").is_dir() or not shutil.which("systemctl"):
         return None
     result = subprocess.run(  # noqa: S603
-        ["systemctl", "is-active", _SERVICE],  # noqa: S607
+        ["systemctl", "is-active", _unit],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,
@@ -171,14 +175,44 @@ def _after_change() -> None:
     state = _service_state()
     if state is None:
         return
-    command = f"sudo systemctl restart {_SERVICE}"
     if state == "active":
-        _say(f"Restart the agent to apply the change: {command}")
+        _say(f"Restart the agent to apply the change: sudo systemctl restart {_unit}")
+    elif _instance is not None:
+        # A further agent is not enabled by the package, only the main one.
+        _say(f"The agent is not running ({state}), start it: sudo systemctl enable --now {_unit}")
     else:
-        _say(f"The agent is not running ({state}), start it: {command}")
+        _say(f"The agent is not running ({state}), start it: sudo systemctl restart {_unit}")
 
 
 # ------------------------------------------------------------------- general
+
+
+def _state_file(instance: str | None) -> str:
+    """Each agent keeps its own memory, two must never share one file."""
+    if instance is None:
+        return PACKAGE_STATE_FILE
+    return str(Path(PACKAGE_STATE_FILE).with_name(f"{instance}.state.json"))
+
+
+def _instance_name(value: str) -> str:
+    if not _INSTANCE.match(value):
+        raise argparse.ArgumentTypeError("use lowercase letters, digits, - and _")
+    return value
+
+
+def _select_instance(args: argparse.Namespace) -> None:
+    """Turn --instance into a configuration path and find the matching systemd unit."""
+    global _unit, _instance  # noqa: PLW0603
+    default = Path(DEFAULT_CONFIG)
+    if getattr(args, "instance", None):
+        args.config = str(default.with_name(f"{args.instance}.yaml"))
+    if not hasattr(args, "config"):
+        return
+    path = Path(args.config)
+    _instance = None
+    if path.parent == default.parent and path.suffix == ".yaml" and path != default:
+        _instance = path.stem
+    _unit = f"{_SERVICE}@{_instance}" if _instance else _SERVICE
 
 
 def cmd_init(args: argparse.Namespace) -> int:
@@ -193,13 +227,15 @@ def cmd_init(args: argparse.Namespace) -> int:
         {
             "agent_id": args.agent_id,
             "shared_key": key,
-            "state_file": args.state_file,
+            "state_file": args.state_file or _state_file(_instance),
         }
     )
     _say(f"Created {target.path}")
     _say(f"Agent ID:   {args.agent_id}")
     _say(f"Shared key: {key}")
     _say("Enter both when adding the integration in Home Assistant.")
+    if _instance is not None:
+        _say(f"Use --instance {_instance} with every command for this agent, its service is {_unit}.")
     return 0
 
 
@@ -666,6 +702,13 @@ def build_parser() -> argparse.ArgumentParser:
     """Return the command line definition."""
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--config", default=DEFAULT_CONFIG, help="configuration file")
+    common.add_argument(
+        "--instance",
+        type=_instance_name,
+        metavar="NAME",
+        help="a further agent on this machine: /etc/ha-hypervisor-agent/NAME.yaml, "
+        "service ha-hypervisor-agent@NAME",
+    )
 
     parser = argparse.ArgumentParser(
         prog="ha-hypervisor-agent",
@@ -684,7 +727,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     init = commands.add_parser("init", parents=[common], help="create the configuration file")
     init.add_argument("--agent-id", default="lab", help="name of this environment")
-    init.add_argument("--state-file", default=PACKAGE_STATE_FILE, help=argparse.SUPPRESS)
+    init.add_argument("--state-file", default=None, help=argparse.SUPPRESS)
     init.add_argument("--force", action="store_true", help="replace an existing file")
     init.set_defaults(handler=cmd_init)
 
@@ -814,6 +857,7 @@ def _add_hosts(commands: Any, common: argparse.ArgumentParser, *, proxmox: bool)
 def main(argv: list[str] | None = None) -> int:
     """Run the selected command."""
     args = build_parser().parse_args(argv)
+    _select_instance(args)
     try:
         return args.handler(args)
     except ConfigError as err:
