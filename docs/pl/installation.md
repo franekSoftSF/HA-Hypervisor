@@ -158,6 +158,14 @@ pveum user token add ha-hypervisor@pve agent --privsep 0
 Ostatnie polecenie raz pokazuje sekret tokenu. `Sys.PowerMgmt` wyłącza węzły, `Sys.Console` zmienia stan zasobów HA,
 `VM.GuestAgent.Audit` odczytuje adresy IP maszyn (w Proxmox VE 9 zastąpiło `VM.Monitor`).
 
+**Agent na samym węźle Proxmox.** Przy jednym węźle agenta można zainstalować też na węźle (Proxmox VE 9 to Debian 13,
+polecenia wykonuj jako root, bez `sudo`). Agent rozpoznaje swój węzeł po nazwie hosta: wyłącza go jako ostatni, tuż
+przedtem zgłasza operację jako zakończoną i nigdy nie wyłącza go jako pustego hosta po scenariuszu. Podgląd wyłączenia
+ostrzega wpisem `self_hosted:WĘZEŁ`. Nie może natomiast włączyć węzła z powrotem, bo agent wyłącza się razem z nim:
+włącz go ręcznie, z interfejsu BMC albo harmonogramem zasilania w BIOS. Do zdalnego startu zainstaluj agenta na innej,
+zawsze włączonej maszynie. Agent w maszynie lub kontenerze na tym samym węźle nie jest obsługiwany: zatrzymałby sam
+siebie razem z innymi maszynami.
+
 ## 4. Sterowanie zasilaniem serwera
 
 Uruchomienie klastra wymaga sposobu na włączenie całkowicie wyłączonego hosta.
@@ -182,7 +190,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.6.0
+VERSION=0.6.1
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"

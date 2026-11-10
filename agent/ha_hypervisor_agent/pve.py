@@ -8,6 +8,7 @@ whole cluster, a call about another node is forwarded by Proxmox itself.
 from __future__ import annotations
 
 import logging
+import socket
 import time
 from typing import Any
 from urllib.parse import quote
@@ -36,6 +37,11 @@ _AGENT_TIMEOUT = 4
 GUEST_TYPES = ("qemu", "lxc")
 HA_STARTED = "started"
 HA_STOPPED = "stopped"
+
+
+def local_node_name() -> str:
+    """Return the name of this machine, equal to the node name when the agent runs on Proxmox."""
+    return socket.gethostname().split(".")[0]
 
 
 def guest_id(kind: str, vmid: int | str) -> str:

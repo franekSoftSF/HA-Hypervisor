@@ -158,6 +158,14 @@ pveum user token add ha-hypervisor@pve agent --privsep 0
 The last command prints the token secret once. `Sys.PowerMgmt` shuts nodes down, `Sys.Console` changes HA resource
 states, `VM.GuestAgent.Audit` reads guest IP addresses (Proxmox VE 9 replaced `VM.Monitor` with it).
 
+**Agent on the Proxmox node itself.** For a single node the agent can also be installed on the node (Proxmox VE 9 is
+Debian 13, run the commands as root without `sudo`). It recognises its node by the host name: it shuts that node down
+last, reports the operation as completed just before, and never powers it off as an empty host after a scenario.
+The shutdown preview warns with `self_hosted:NODE`. What it cannot do is power the node on again, because the agent
+stops with it: start it by hand, from the BMC web interface, or with a BIOS power schedule. For remote start install the
+agent on another always-on machine instead. An agent inside a VM or container of the same node is not supported: it
+would stop itself together with the guests.
+
 ## 4. Server power control
 
 Starting the cluster needs a way to power on a host that is completely off.
@@ -182,7 +190,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.6.0
+VERSION=0.6.1
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"

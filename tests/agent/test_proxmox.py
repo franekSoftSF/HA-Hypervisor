@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 import pytest
@@ -404,3 +405,61 @@ def test_guest_migrated_by_ha_is_found_again(ha):
     ha.guest("app01").node = "pve3"
     client.power_on("qemu-103")
     assert ha.guest("app01").running
+
+
+# ------------------------------------------------------ agent on the node
+
+
+def wait_off(cluster: Cluster, name: str) -> None:
+    """The node goes down a moment after the agent asked, like a real one."""
+    deadline = time.monotonic() + 3
+    while cluster.nodes[name].online and time.monotonic() < deadline:
+        time.sleep(0.02)
+    assert not cluster.nodes[name].online
+
+
+@pytest.fixture
+def on_node(tmp_path, monkeypatch, single):
+    """The agent runs on the node "pve" itself."""
+    monkeypatch.setattr("ha_hypervisor_agent.pve_operations.local_node_name", lambda: "pve")
+    monkeypatch.setattr(ProxmoxOrchestrator, "SELF_GRACE", 0)
+    lab = Lab(tmp_path / "self", single.cluster, monkeypatch)
+    lab.no_wake.add("pve")  # nothing can wake it, the agent is on it
+    return lab
+
+
+def test_agent_on_its_node_shuts_it_down_last_and_reports_first(on_node):
+    operation = on_node.run(CMD_CLUSTER_SHUTDOWN, {"dry_run": True})
+    assert operation["status"] == OP_COMPLETED, operation
+    assert "self_hosted:pve" in operation["plan"]["warnings"]
+    assert operation["plan"]["hosts"] == ["pve"]
+
+    operation = on_node.run(CMD_CLUSTER_SHUTDOWN)
+    assert operation["status"] == OP_COMPLETED, operation
+    assert "runs this agent" in operation["detail"]
+    wait_off(on_node.cluster, "pve")
+    assert on_node.cluster.violations == []
+    # Completed was published before the node went down.
+    completed = [u for u in on_node.updates if u["status"] == OP_COMPLETED and not u["dry_run"]]
+    assert completed and completed[0]["step"] == "stop_hosts"
+
+
+def test_agent_on_one_node_of_a_cluster_goes_last(tmp_path, monkeypatch, cluster):
+    monkeypatch.setattr("ha_hypervisor_agent.pve_operations.local_node_name", lambda: "pve1")
+    monkeypatch.setattr(ProxmoxOrchestrator, "SELF_GRACE", 0)
+    lab = Lab(tmp_path / "self", cluster.cluster, monkeypatch)
+    operation = lab.run(CMD_CLUSTER_SHUTDOWN)
+    assert operation["status"] == OP_COMPLETED, operation
+    assert operation["plan"]["hosts"] == ["pve2", "pve3", "pve1"]
+    wait_off(lab.cluster, "pve1")
+    offs = [e for e in lab.cluster.events if e.startswith("node_off")]
+    assert offs == ["node_off:pve2", "node_off:pve3", "node_off:pve1"]
+
+
+def test_agent_never_stops_its_own_node_as_empty(on_node):
+    for guest in on_node.cluster.guests.values():
+        guest.running = False
+    on_node.run(CMD_SCENARIO_START, _scenario(["qemu-100"], wait="power"))
+    operation = on_node.run(CMD_SCENARIO_STOP, _scenario(["qemu-100"], empty=True))
+    assert operation["status"] == OP_COMPLETED, operation
+    assert on_node.cluster.nodes["pve"].online

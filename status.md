@@ -1,6 +1,6 @@
 # Status
 
-Version 0.6.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
+Version 0.6.1, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
@@ -13,6 +13,8 @@ Version 0.6.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
 - Several agents on one machine: systemd template ha-hypervisor-agent@NAME, CLI --instance NAME, own state file.
 - Snapshots on both platforms: create, revert, delete actions in HA, Snapshots sensor per VM, scenario option
   "revert to snapshot before start". Preflight checks every VM first; vCenter and protected VMs are never reverted.
+- Agent on the Proxmox node itself (the user's single node setup): own node last, completed reported first, no remote
+  start possible. An agent in a guest of the same node is not supported.
 - Repairs after every start: agent not answering within a minute, agent older than the integration.
 - Tests in Docker on the real Home Assistant 2026.11 image, hassfest, end-to-end stack with `vcsim`.
 

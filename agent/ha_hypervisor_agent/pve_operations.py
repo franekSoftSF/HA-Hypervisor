@@ -13,12 +13,14 @@ HA resources.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 from .config import HostConfig
 from .errors import GuestNotFound, PlatformError, PlatformUnavailable
 from .inventory import View, is_system_vm
 from .operations import OperationFailed, Orchestrator
+from .protocol import OP_COMPLETED
 from .power import POWER_OFF, PowerError
 from .pve import (
     HA_STARTED,
@@ -26,6 +28,7 @@ from .pve import (
     PveInfra,
     build_pve_view,
     cluster_quorate,
+    local_node_name,
     started_ha_guests,
 )
 
@@ -36,12 +39,18 @@ class ProxmoxOrchestrator(Orchestrator):
     """Runs one operation at a time on Proxmox VE."""
 
     ERROR_CODE = "proxmox_error"
+    SELF_GRACE = 2.0
     _infra: PveInfra
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         """Use the Proxmox view of the environment."""
         super().__init__(*args, **kwargs)
         self._build_view = build_pve_view
+        # Set when the agent runs on one of the nodes it drives.
+        self._self_node = local_node_name()
+
+    def _is_self(self, name: str) -> bool:
+        return name == self._self_node
 
     def _node(self, host: HostConfig) -> ProxmoxClient:
         try:
@@ -71,6 +80,10 @@ class ProxmoxOrchestrator(Orchestrator):
                 continue
             host = self._host(item["id"])
             self._node(host)
+            if self._is_self(host.name):
+                # The agent stops with this node: it cannot power it on again.
+                warnings.append(f"self_hosted:{host.name}")
+                continue
             power = self._infra.power(host)
             if not power.can_wake():
                 raise OperationFailed("no_wake_method", host.name)
@@ -78,6 +91,7 @@ class ProxmoxOrchestrator(Orchestrator):
                 warnings.append(f"wake_unverified:{host.name}")
             hosts.append(host.name)
 
+        own = [name for name in view.hosts if self._is_self(name) and view.hosts[name]["connected"]]
         running = [
             vm for vm in view.vms.values() if vm["power"] == "on" and not is_system_vm(vm)
         ]
@@ -89,7 +103,8 @@ class ProxmoxOrchestrator(Orchestrator):
             "ha_resources": started_ha_guests(view),
             "retreat_clusters": [],
             "vcenter": None,
-            "hosts": hosts,
+            # The node running the agent goes last.
+            "hosts": hosts + own,
             "warnings": warnings,
         }
 
@@ -117,7 +132,23 @@ class ProxmoxOrchestrator(Orchestrator):
 
         self._step("stop_hosts", ", ".join(plan["hosts"]))
         for name in plan["hosts"]:
-            self._stop_host(self._host(name))
+            if self._is_self(name):
+                self._stop_own_node(self._host(name))
+            else:
+                self._stop_host(self._host(name))
+
+    def _stop_own_node(self, host: HostConfig) -> None:
+        """Report the operation as done, then shut down the node this agent runs on."""
+        assert self._op is not None  # noqa: S101
+        self._op.update(
+            status=OP_COMPLETED,
+            finished=int(time.time()),
+            detail=f"{host.name} runs this agent and is shutting down",
+        )
+        self._publish()
+        # A moment for the retained message to reach the broker.
+        time.sleep(self.SELF_GRACE)
+        self._node(host).shutdown_node(host.name)
 
     def _stop_host(self, host: HostConfig) -> None:
         self._node(host).shutdown_node(host.name)
@@ -134,7 +165,12 @@ class ProxmoxOrchestrator(Orchestrator):
         busy = {
             vm["host"] for vm in view.vms.values() if vm["power"] == "on" and not is_system_vm(vm)
         }
-        empty = sorted(name for name in hosts - busy if view.hosts.get(name, {}).get("connected"))
+        # Never the node running the agent: the scenario would end with the agent gone.
+        empty = sorted(
+            name
+            for name in hosts - busy
+            if view.hosts.get(name, {}).get("connected") and not self._is_self(name)
+        )
         if not empty:
             return
         if view.clusters:

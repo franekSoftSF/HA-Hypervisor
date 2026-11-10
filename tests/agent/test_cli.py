@@ -164,7 +164,7 @@ def test_changes_remind_to_restart_the_service(path, monkeypatch, capsys, state,
     out = capsys.readouterr().out
     if expected:
         assert expected in out
-        assert "sudo systemctl restart ha-hypervisor-agent" in out
+        assert "systemctl restart ha-hypervisor-agent" in out
     else:
         assert "systemctl" not in out
 
@@ -466,17 +466,27 @@ def test_instance_has_its_own_file_state_and_service(etc, tmp_path, monkeypatch,
     # The reminder names the unit of this configuration.
     monkeypatch.setattr(cli, "_service_state", lambda: "inactive")
     cli.main(["mqtt", "set", "--host", "b", "--no-tls", "--instance", "pve"])
-    assert "sudo systemctl enable --now ha-hypervisor-agent@pve" in capsys.readouterr().out
+    assert "systemctl enable --now ha-hypervisor-agent@pve" in capsys.readouterr().out
     assert yaml.safe_load((etc / "pve.yaml").read_text())["mqtt"]["host"] == "b"
     assert "mqtt" not in yaml.safe_load((etc / "config.yaml").read_text())
 
     monkeypatch.setattr(cli, "_service_state", lambda: "active")
     cli.main(["mqtt", "set", "--host", "c", "--no-tls"])
     out = capsys.readouterr().out
-    assert "sudo systemctl restart ha-hypervisor-agent\n" in out + "\n"
+    assert "systemctl restart ha-hypervisor-agent\n" in out + "\n"
     assert "@" not in out
 
 
 def test_instance_name_is_checked(etc):
     with pytest.raises(SystemExit):
         cli.main(["show", "--instance", "../etc"])
+
+
+@pytest.mark.parametrize(("uid", "prefix"), [(0, ""), (1000, "sudo ")])
+def test_hints_use_sudo_only_when_needed(path, monkeypatch, capsys, uid, prefix):
+    run(path, "init")
+    monkeypatch.setattr(cli, "_service_state", lambda: "active")
+    monkeypatch.setattr(cli.os, "geteuid", lambda: uid, raising=False)
+    capsys.readouterr()
+    run(path, "mqtt", "set", "--host", "b", "--no-tls")
+    assert f": {prefix}systemctl restart" in capsys.readouterr().out

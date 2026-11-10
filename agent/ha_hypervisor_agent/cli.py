@@ -170,18 +170,23 @@ def _service_state() -> str | None:
     return result.stdout.strip() or None
 
 
+def _sudo() -> str:
+    """Return the sudo prefix, empty for root (Proxmox has no sudo)."""
+    return "" if hasattr(os, "geteuid") and os.geteuid() == 0 else "sudo "
+
+
 def _after_change() -> None:
     """Remind that the running agent reads its configuration only at start."""
     state = _service_state()
     if state is None:
         return
     if state == "active":
-        _say(f"Restart the agent to apply the change: sudo systemctl restart {_unit}")
+        _say(f"Restart the agent to apply the change: {_sudo()}systemctl restart {_unit}")
     elif _instance is not None:
         # A further agent is not enabled by the package, only the main one.
-        _say(f"The agent is not running ({state}), start it: sudo systemctl enable --now {_unit}")
+        _say(f"The agent is not running ({state}), start it: {_sudo()}systemctl enable --now {_unit}")
     else:
-        _say(f"The agent is not running ({state}), start it: sudo systemctl restart {_unit}")
+        _say(f"The agent is not running ({state}), start it: {_sudo()}systemctl restart {_unit}")
 
 
 # ------------------------------------------------------------------- general

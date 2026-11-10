@@ -16,7 +16,7 @@ systemctl show -p NRestarts --value $NAME | grep -qx 0
 
 echo "--- configured"
 $NAME init --agent-id systemdtest >/dev/null
-$NAME mqtt set --host mosquitto --no-tls | grep -q "start it: sudo systemctl restart"
+$NAME mqtt set --host mosquitto --no-tls | grep -q "start it: systemctl restart"
 printf 'pass\n' | $NAME vcenter set --host vcsim --username user --password-stdin >/dev/null
 printf 'pass\n' | $NAME esxi add DC0_C0_H0 --address esxi --username user --password-stdin --wol-mac 00:25:90:00:00:01 >/dev/null
 systemctl reset-failed $NAME

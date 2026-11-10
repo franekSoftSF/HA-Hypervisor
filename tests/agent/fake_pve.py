@@ -128,9 +128,10 @@ class Cluster:
 
     def stop(self) -> None:
         for node in self.nodes.values():
-            if node.server is not None:
-                node.server.shutdown()
-                node.server.server_close()
+            server, node.server = node.server, None
+            if server is not None:
+                server.shutdown()
+                server.server_close()
 
     @property
     def quorate(self) -> bool:
