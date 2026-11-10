@@ -67,6 +67,7 @@ OP_CANCELLED = "cancelled"
 CLUSTER_ON = "on"
 CLUSTER_DEGRADED = "degraded"
 CLUSTER_OFF = "off"
+CLUSTER_NOT_CONFIGURED = "not_configured"
 
 # Language-neutral step keys, translated in Home Assistant.
 STEPS = (
@@ -87,6 +88,7 @@ STEPS = (
 # Language-neutral error codes, translated in Home Assistant.
 ERROR_CODES = (
     "busy",
+    "not_configured",
     "invalid_request",
     "unknown_command",
     "no_operation",

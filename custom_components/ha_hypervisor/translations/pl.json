@@ -97,7 +97,7 @@
       "cluster_memory_percent": { "name": "Użycie pamięci" },
       "cluster_state": {
         "name": "Klaster",
-        "state": { "on": "Włączony", "degraded": "Częściowo działa", "off": "Wyłączony" }
+        "state": { "on": "Włączony", "degraded": "Częściowo działa", "off": "Wyłączony", "not_configured": "Nieskonfigurowany" }
       },
       "datastore_capacity": { "name": "Pojemność" },
       "datastore_free": { "name": "Wolne miejsce" },
@@ -173,6 +173,7 @@
     "agent_ambiguous": { "message": "Wskaż agenta polem config_entry_id." },
     "scenario_not_found": { "message": "Scenariusz {name} nie istnieje." },
     "agent_busy": { "message": "Trwa inna operacja." },
+    "agent_not_configured": { "message": "Agent nie ma jeszcze skonfigurowanego vCenter ani hostów ESXi." },
     "agent_invalid_request": { "message": "Agent odrzucił żądanie jako nieprawidłowe." },
     "agent_unknown_command": { "message": "Agent nie zna tego polecenia, zaktualizuj go." },
     "agent_no_operation": { "message": "Żadna operacja nie jest w toku." },

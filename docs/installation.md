@@ -141,7 +141,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.3.1
+VERSION=0.3.2
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -221,7 +221,7 @@ is left. The log should say `Connected to the broker`.
 Each command has `--help`. Options of `esxi add` include `--address`, `--bmc-type`, `--wol-mac`, `--wol-broadcast`,
 `--no-bmc` and `--no-wol`.
 
-Restart the service after changing the configuration: `sudo systemctl restart ha-hypervisor-agent`.
+Restart the service after changing the configuration: `sudo systemctl restart ha-hypervisor-agent`. Each command reminds you. The agent connects to Home Assistant as soon as MQTT is set: it shows the cluster as **Not configured** until vCenter and a host are added, so the integration can be added before that.
 
 For scripts, `--password-stdin` reads the password from standard input (`esxi add` reads the ESXi password first, then
 the BMC one with `--bmc-password-stdin`). `--password-env NAME` stores only a reference, with the value kept in

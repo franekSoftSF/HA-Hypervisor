@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from conftest import FakeInfra, make_config
+from conftest import FakeInfra, Lab, make_config
 from ha_hypervisor_agent.inventory import build_state, build_view, remember
 from ha_hypervisor_agent.operations import Busy, OperationFailed, Orchestrator
 from ha_hypervisor_agent.protocol import (
@@ -296,6 +296,58 @@ def test_state_degraded_without_vcenter(harness):
 
     assert state["cluster"] == "degraded"
     assert state["source"] == "esxi"
+
+
+def _mqtt_only(tmp_path):
+    from ha_hypervisor_agent.config import parse
+
+    return parse(
+        {
+            "agent_id": "lab",
+            "shared_key": "k" * 40,
+            "mqtt": {"host": "broker"},
+            "state_file": str(tmp_path / "state.json"),
+        }
+    )
+
+
+def test_mqtt_alone_is_a_valid_configuration(tmp_path):
+    config = _mqtt_only(tmp_path)
+    assert not config.configured
+    assert config.vcenter is None
+    assert config.vcenter_vm_name is None
+
+
+def test_agent_without_vcenter_reports_not_configured(tmp_path):
+    from ha_hypervisor_agent.vim import Infra
+
+    config = _mqtt_only(tmp_path)
+    infra = Infra(config)
+    store = Store(config.state_file)
+    state = build_state(config, infra, store, build_view(config, infra))
+    assert state["cluster"] == "not_configured"
+    assert state["hosts"] == []
+    assert state["vms"] == []
+
+
+def test_operations_need_a_configuration(tmp_path):
+    config = _mqtt_only(tmp_path)
+    orchestrator = Orchestrator(config, FakeInfra(Lab()), Store(config.state_file), lambda _: None)
+    for kind in (SHUTDOWN, START):
+        with pytest.raises(OperationFailed) as err:
+            orchestrator.start(kind, {})
+        assert err.value.code == "not_configured"
+
+
+def test_check_lists_what_is_missing(tmp_path, monkeypatch, capsys):
+    from ha_hypervisor_agent import service
+
+    monkeypatch.setattr(service, "test_mqtt", lambda *_: None)
+    assert service.check(_mqtt_only(tmp_path)) == 1
+    out = capsys.readouterr().out
+    assert "OK    MQTT" in out
+    assert "MISSING vCenter" in out
+    assert "MISSING ESXi hosts" in out
 
 
 def test_state_on(harness):

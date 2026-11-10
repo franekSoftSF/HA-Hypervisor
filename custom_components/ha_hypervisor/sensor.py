@@ -37,6 +37,7 @@ from .entity import (
 from .link import AgentLink
 from .protocol import (
     CLUSTER_DEGRADED,
+    CLUSTER_NOT_CONFIGURED,
     CLUSTER_OFF,
     CLUSTER_ON,
     CMD_SCENARIO_START,
@@ -163,7 +164,7 @@ CLUSTER_SENSORS = (
         key="cluster_state",
         translation_key="cluster_state",
         device_class=SensorDeviceClass.ENUM,
-        options=[CLUSTER_ON, CLUSTER_DEGRADED, CLUSTER_OFF],
+        options=[CLUSTER_ON, CLUSTER_DEGRADED, CLUSTER_OFF, CLUSTER_NOT_CONFIGURED],
         value_fn=lambda s: s["cluster"],
     ),
     _measure("cluster_cpu_percent", PERCENTAGE, _cluster_cpu),

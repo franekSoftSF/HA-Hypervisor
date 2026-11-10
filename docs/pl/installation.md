@@ -142,7 +142,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.3.1
+VERSION=0.3.2
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -222,7 +222,7 @@ którego nie da się sprawdzić. W logu powinien pojawić się wpis `Connected t
 Każde polecenie ma `--help`. Opcje `esxi add` to m.in. `--address`, `--bmc-type`, `--wol-mac`, `--wol-broadcast`,
 `--no-bmc` i `--no-wol`.
 
-Po zmianie konfiguracji uruchom usługę ponownie: `sudo systemctl restart ha-hypervisor-agent`.
+Po zmianie konfiguracji uruchom usługę ponownie: `sudo systemctl restart ha-hypervisor-agent`. Każde polecenie o tym przypomina. Agent łączy się z Home Assistantem już po ustawieniu MQTT: do czasu dodania vCenter i hosta pokazuje klaster jako **Nieskonfigurowany**, więc integrację można dodać wcześniej.
 
 W skryptach `--password-stdin` czyta hasło ze standardowego wejścia (`esxi add` czyta najpierw hasło ESXi, a potem hasło
 BMC z `--bmc-password-stdin`). `--password-env NAZWA` zapisuje tylko odwołanie, a wartość trzymasz w

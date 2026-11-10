@@ -97,7 +97,7 @@
       "cluster_memory_percent": { "name": "Memory usage" },
       "cluster_state": {
         "name": "Cluster",
-        "state": { "on": "On", "degraded": "Degraded", "off": "Off" }
+        "state": { "on": "On", "degraded": "Degraded", "off": "Off", "not_configured": "Not configured" }
       },
       "datastore_capacity": { "name": "Capacity" },
       "datastore_free": { "name": "Free space" },
@@ -173,6 +173,7 @@
     "agent_ambiguous": { "message": "Select the agent with config_entry_id." },
     "scenario_not_found": { "message": "Scenario {name} does not exist." },
     "agent_busy": { "message": "Another operation is running." },
+    "agent_not_configured": { "message": "The agent has no vCenter or ESXi hosts configured yet." },
     "agent_invalid_request": { "message": "The agent rejected the request as invalid." },
     "agent_unknown_command": { "message": "The agent does not know this command, update it." },
     "agent_no_operation": { "message": "No operation is running." },

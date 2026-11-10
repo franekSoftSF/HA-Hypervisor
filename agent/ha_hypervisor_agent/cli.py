@@ -8,7 +8,9 @@ import logging
 import os
 from pathlib import Path
 import re
+import shutil
 import signal
+import subprocess
 import sys
 from typing import Any
 
@@ -31,6 +33,7 @@ from .service import AgentService, check, test_mqtt
 from .vim import VimClient, VimError, VimUnavailable
 
 _GROUP = "ha-hypervisor-agent"
+_SERVICE = "ha-hypervisor-agent"
 _ENV_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _HIDDEN = "********"
 _SECRET_KEYS = ("password", "shared_key")
@@ -143,6 +146,31 @@ def _say(text: str) -> None:
     print(text)  # noqa: T201
 
 
+def _service_state() -> str | None:
+    """Return the systemd state of the agent service, None without systemd."""
+    if not Path("/run/systemd/system").is_dir() or not shutil.which("systemctl"):
+        return None
+    result = subprocess.run(  # noqa: S603
+        ["systemctl", "is-active", _SERVICE],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout.strip() or None
+
+
+def _after_change() -> None:
+    """Remind that the running agent reads its configuration only at start."""
+    state = _service_state()
+    if state is None:
+        return
+    command = f"sudo systemctl restart {_SERVICE}"
+    if state == "active":
+        _say(f"Restart the agent to apply the change: {command}")
+    else:
+        _say(f"The agent is not running ({state}), start it: {command}")
+
+
 # ------------------------------------------------------------------- general
 
 
@@ -191,7 +219,8 @@ def cmd_key_rotate(args: argparse.Namespace) -> int:
     data["shared_key"] = generate_key()
     target.save(data)
     _say(f"New shared key: {data['shared_key']}")
-    _say("Restart the agent and enter the key in Home Assistant (Reconfigure).")
+    _say("Enter it in Home Assistant (Reconfigure).")
+    _after_change()
     return 0
 
 
@@ -235,6 +264,7 @@ def cmd_mqtt_set(args: argparse.Namespace) -> int:
     target.save(data)
     tls = "TLS" if settings.get("tls", True) else "no TLS"
     _say(f"Saved MQTT connection to {settings['host']}:{settings['port']} ({tls})")
+    _after_change()
     return 0
 
 
@@ -275,6 +305,7 @@ def cmd_vcenter_set(args: argparse.Namespace) -> int:
     data["vcenter"] = settings
     target.save(data)
     _say(f"Saved vCenter connection to {settings['host']}")
+    _after_change()
     return 0
 
 
@@ -386,6 +417,7 @@ def cmd_esxi_add(args: argparse.Namespace) -> int:
     _say(f"Saved host {args.name}")
     if "bmc" not in entry and "wol" not in entry:
         _say("Warning: without --bmc-address or --wol-mac the agent cannot power this host on.")
+    _after_change()
     return 0
 
 
@@ -415,6 +447,7 @@ def cmd_esxi_remove(args: argparse.Namespace) -> int:
     data["hosts"] = remaining
     target.save(data)
     _say(f"Removed host {args.name}")
+    _after_change()
     return 0
 
 

@@ -130,7 +130,6 @@ def test_missing_environment_variable(tmp_path):
         ({"unknown_key": 1}, "unknown"),
         ({"agent_id": "Bad/Id"}, "agent_id"),
         ({"shared_key": "short"}, "too short"),
-        ({"hosts": []}, "at least one"),
         (
             {"hosts": [{"name": "h", "address": "a", "username": "u", "password": "p", "wol": {"mac": "zz"}}]},
             "MAC",

@@ -97,14 +97,25 @@ class AgentConfig:
     agent_id: str
     shared_key: str
     mqtt: MqttConfig
-    vcenter: VCenterConfig
-    hosts: tuple[HostConfig, ...]
+    # Both may come later: the agent reaches Home Assistant with MQTT alone.
+    vcenter: VCenterConfig | None = None
+    hosts: tuple[HostConfig, ...] = ()
     protected_vms: tuple[str, ...] = ()
     force_after_timeout: bool = True
     poll_interval: float = 30
     state_file: str = "/data/state.json"
     log_level: str = "INFO"
     timeouts: Timeouts = field(default_factory=Timeouts)
+
+    @property
+    def vcenter_vm_name(self) -> str | None:
+        """Return the name of the vCenter VM, if it runs on the managed hosts."""
+        return self.vcenter.vm_name if self.vcenter else None
+
+    @property
+    def configured(self) -> bool:
+        """Return True when vCenter and at least one host are set."""
+        return self.vcenter is not None and bool(self.hosts)
 
     def host(self, name: str) -> HostConfig | None:
         """Return the configuration of a host by its vCenter name."""
@@ -158,12 +169,12 @@ def parse(raw: Any) -> AgentConfig:
     data = _expand(raw)
     if not isinstance(data, dict):
         raise ConfigError("the configuration must be a mapping")
-    for key in ("mqtt", "vcenter", "hosts", "agent_id", "shared_key"):
+    for key in ("mqtt", "agent_id", "shared_key"):
         if key not in data:
             raise ConfigError(f"missing key {key}")
 
     hosts = []
-    for index, item in enumerate(data["hosts"] or []):
+    for index, item in enumerate(data.get("hosts") or []):
         where = f"hosts[{index}]"
         if not isinstance(item, dict):
             raise ConfigError(f"{where}: expected a mapping")
@@ -182,7 +193,9 @@ def parse(raw: Any) -> AgentConfig:
         data,
         "config",
         mqtt=_build(MqttConfig, data["mqtt"], "mqtt"),
-        vcenter=_build(VCenterConfig, data["vcenter"], "vcenter"),
+        vcenter=_build(VCenterConfig, data["vcenter"], "vcenter")
+        if data.get("vcenter")
+        else None,
         hosts=tuple(hosts),
         protected_vms=tuple(data.get("protected_vms") or ()),
         timeouts=_build(Timeouts, data.get("timeouts") or {}, "timeouts"),
@@ -197,8 +210,6 @@ def _validate(config: AgentConfig) -> None:
     if not is_valid_key(config.shared_key):
         raise ConfigError("shared_key: too short, run the genkey command")
     _validate_mqtt(config.mqtt)
-    if not config.hosts:
-        raise ConfigError("hosts: at least one host is required")
     names = [host.name for host in config.hosts]
     if len(set(names)) != len(names):
         raise ConfigError("hosts: names must be unique")

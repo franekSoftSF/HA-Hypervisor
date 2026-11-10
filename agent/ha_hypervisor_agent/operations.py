@@ -136,6 +136,8 @@ class Orchestrator:
 
     def start(self, kind: str, body: dict[str, Any]) -> str:
         """Start an operation in the background and return its id."""
+        if not self._config.configured:
+            raise OperationFailed("not_configured")
         handlers: dict[str, Callable[[dict[str, Any]], None]] = {
             CMD_CLUSTER_SHUTDOWN: self._cluster_shutdown,
             CMD_CLUSTER_START: self._cluster_start,
@@ -258,7 +260,7 @@ class Orchestrator:
         return view
 
     def _vcenter_vm(self, view: View) -> dict[str, Any] | None:
-        name = self._config.vcenter.vm_name
+        name = self._config.vcenter_vm_name
         return next((vm for vm in view.vms.values() if vm["name"] == name), None)
 
     # ---------------------------------------------------------------- shutdown
@@ -270,9 +272,9 @@ class Orchestrator:
         if view.source == "none":
             # Nothing answers. Either all is off already or the agent is cut off.
             raise OperationFailed("esxi_unavailable", "no host answers")
-        if self._config.vcenter.vm_name and vcenter_vm is None:
+        if self._config.vcenter_vm_name and vcenter_vm is None:
             raise OperationFailed(
-                "vcenter_vm_not_found", self._config.vcenter.vm_name
+                "vcenter_vm_not_found", self._config.vcenter_vm_name
             )
 
         active_hosts = [h for h in view.hosts.values() if h["connected"]]
@@ -445,9 +447,9 @@ class Orchestrator:
         timeouts = self._config.timeouts
         vcenter_host = self._store.get("vcenter_host")
         names = list(wanted)
-        if self._config.vcenter.vm_name and vcenter_host and vcenter_host not in names:
+        if self._config.vcenter_vm_name and vcenter_host and vcenter_host not in names:
             names.append(vcenter_host)
-        if self._config.vcenter.vm_name and not vcenter_host:
+        if self._config.vcenter_vm_name and not vcenter_host:
             # Never seen where vCenter runs, it can be on any of them.
             names = [host.name for host in self._config.hosts]
         hosts = [self._host(name) for name in names]
@@ -471,7 +473,7 @@ class Orchestrator:
                 host.name,
             )
 
-        if self._config.vcenter.vm_name:
+        if self._config.vcenter_vm_name:
             self._start_vcenter(hosts)
 
         self._step("wait_vcenter", self._config.vcenter.host)
@@ -515,7 +517,7 @@ class Orchestrator:
         return all(hosts.get(name, {}).get("connected") for name in names)
 
     def _start_vcenter(self, hosts: list[HostConfig]) -> None:
-        name = self._config.vcenter.vm_name
+        name = self._config.vcenter_vm_name
         self._step("start_vcenter", name)
         if self._vcenter_ready():
             return
@@ -650,7 +652,7 @@ class Orchestrator:
         vm = view.vms.get(vm_id)
         if vm is None:
             raise OperationFailed("vm_unreachable", vm_id)
-        protected = set(self._config.protected_vms) | {self._config.vcenter.vm_name}
+        protected = set(self._config.protected_vms) | {self._config.vcenter_vm_name}
         if action != VM_ACTION_ON and (vm["name"] in protected or is_system_vm(vm)):
             raise OperationFailed("vm_protected", vm["name"])
 

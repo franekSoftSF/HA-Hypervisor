@@ -152,6 +152,23 @@ def test_tls_failure_suggests_no_tls(path, monkeypatch, capsys):
     assert "--no-tls" in capsys.readouterr().out
 
 
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [("active", "Restart the agent"), ("failed", "not running (failed)"), (None, None)],
+)
+def test_changes_remind_to_restart_the_service(path, monkeypatch, capsys, state, expected):
+    run(path, "init")
+    monkeypatch.setattr(cli, "_service_state", lambda: state)
+    capsys.readouterr()
+    run(path, "mqtt", "set", "--host", "b", "--no-tls")
+    out = capsys.readouterr().out
+    if expected:
+        assert expected in out
+        assert "sudo systemctl restart ha-hypervisor-agent" in out
+    else:
+        assert "systemctl" not in out
+
+
 def test_mqtt_needs_a_password_for_a_login(path, stdin):
     run(path, "init")
     assert run(path, "mqtt", "set", "--host", "b", "--username", "u") == cli.EXIT_CONFIG

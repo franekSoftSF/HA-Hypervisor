@@ -395,6 +395,8 @@ class Infra:
     def vcenter(self) -> VimClient:
         """Return a vCenter session or raise VimUnavailable."""
         config = self._config.vcenter
+        if config is None:
+            raise VimUnavailable("vCenter is not configured")
         return self._session(
             "vcenter",
             config.host,

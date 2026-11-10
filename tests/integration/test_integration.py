@@ -456,3 +456,15 @@ async def test_diagnostics_hide_the_key(hass, agent):
 
 def test_seal_is_importable_without_homeassistant_state():
     assert seal(KEY, "t", "k", {})
+
+
+async def test_cluster_not_configured_state(hass, agent):
+    await setup_entry(hass, agent)
+    document = state_doc()
+    document["cluster"] = "not_configured"
+    document["hosts"] = []
+    document["vms"] = []
+    agent.fire("state", "state", document)
+    await hass.async_block_till_done()
+    cluster = hass.states.get(entity_id(hass, "lab_cluster_state", "sensor"))
+    assert cluster.state == "not_configured"

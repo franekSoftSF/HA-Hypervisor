@@ -266,6 +266,9 @@ class AgentService:
     def run(self) -> None:
         """Connect and poll until stop() is called."""
         settings = self._config.mqtt
+        if not self._config.configured:
+            _LOGGER.warning("vCenter or ESXi hosts are not configured yet, "
+                            "only Home Assistant is connected")
         _LOGGER.info("Connecting to %s:%s", settings.host, settings.port)
         self._client.connect_async(settings.host, settings.port, keepalive=30)
         self._client.loop_start()
@@ -308,12 +311,16 @@ def check(config: AgentConfig) -> int:
     else:
         print(f"OK    MQTT {config.mqtt.host}")  # noqa: T201
 
-    try:
-        client = infra.vcenter()
-        print(f"OK    vCenter {config.vcenter.host}: {client.version}")  # noqa: T201
-    except VimUnavailable as err:
+    if config.vcenter is None:
         failures += 1
-        print(f"FAIL  vCenter {config.vcenter.host}: {err}")  # noqa: T201
+        print("MISSING vCenter: run vcenter set")  # noqa: T201
+    else:
+        try:
+            client = infra.vcenter()
+            print(f"OK    vCenter {config.vcenter.host}: {client.version}")  # noqa: T201
+        except VimUnavailable as err:
+            failures += 1
+            print(f"FAIL  vCenter {config.vcenter.host}: {err}")  # noqa: T201
 
     for host in config.hosts:
         try:
@@ -332,5 +339,8 @@ def check(config: AgentConfig) -> int:
         else:
             failures += 1
             print(f"FAIL  Power {host.name}: no working method ({methods})")  # noqa: T201
+    if not config.hosts:
+        failures += 1
+        print("MISSING ESXi hosts: run esxi add")  # noqa: T201
     infra.close()
     return 1 if failures else 0

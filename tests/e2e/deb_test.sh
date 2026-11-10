@@ -20,32 +20,14 @@ test "$(stat -c '%U:%G %a' $CONFIG)" = "root:$NAME 640"
 # As a user would type it: the plain port alone must turn TLS off.
 $NAME mqtt set --host mosquitto --transport tcp --port 1883
 $NAME mqtt test
-printf 'pass\n' | $NAME vcenter set --host vcsim --username user --password-stdin
-$NAME vcenter test
-printf 'pass\n' | $NAME esxi add DC0_C0_H0 --address esxi --username user --password-stdin --wol-mac 00:25:90:00:00:01
-$NAME esxi test
-$NAME esxi list
-$NAME show
-$NAME check
 
-echo "--- wrong broker address is reported"
-cp $CONFIG /tmp/good.yaml
-$NAME mqtt set --host nothing-here.invalid --no-tls
-if $NAME mqtt test; then echo "expected a failure"; exit 1; fi
-cp /tmp/good.yaml $CONFIG
-chown root:$NAME $CONFIG
-
-echo "--- running as the service user"
-KEY=$($NAME key show)
-setpriv --reuid="$NAME" --regid="$NAME" --clear-groups $NAME run --config $CONFIG &
-AGENT=$!
-sleep 8
-$PY - "$KEY" <<'EOF'
+echo "--- MQTT alone is enough to reach Home Assistant"
+cat > /tmp/probe.py <<'EOF'
 import sys, threading
 import paho.mqtt.client as mqtt
 from ha_hypervisor_agent.protocol import unseal
 
-key = sys.argv[1]
+key, expected = sys.argv[1], sys.argv[2].split(",")
 root = "ha_hypervisor/debtest/"
 seen = {}
 done = threading.Event()
@@ -67,9 +49,37 @@ assert done.wait(15), f"only got {sorted(seen)}"
 client.loop_stop()
 assert seen["status"].payload == b"online"
 state = unseal(key, root + "state", seen["state"].payload).body
-assert state["cluster"] in ("on", "degraded"), state["cluster"]
+assert state["cluster"] in expected, state["cluster"]
 print("agent published signed state:", state["cluster"], len(state["vms"]), "VMs")
 EOF
+setpriv --reuid="$NAME" --regid="$NAME" --clear-groups $NAME run --config $CONFIG &
+AGENT=$!
+sleep 6
+$PY /tmp/probe.py "$($NAME key show)" not_configured
+kill -TERM $AGENT
+wait $AGENT
+
+printf 'pass\n' | $NAME vcenter set --host vcsim --username user --password-stdin
+$NAME vcenter test
+printf 'pass\n' | $NAME esxi add DC0_C0_H0 --address esxi --username user --password-stdin --wol-mac 00:25:90:00:00:01
+$NAME esxi test
+$NAME esxi list
+$NAME show
+$NAME check
+
+echo "--- wrong broker address is reported"
+cp $CONFIG /tmp/good.yaml
+$NAME mqtt set --host nothing-here.invalid --no-tls
+if $NAME mqtt test; then echo "expected a failure"; exit 1; fi
+cp /tmp/good.yaml $CONFIG
+chown root:$NAME $CONFIG
+
+echo "--- running as the service user"
+KEY=$($NAME key show)
+setpriv --reuid="$NAME" --regid="$NAME" --clear-groups $NAME run --config $CONFIG &
+AGENT=$!
+sleep 8
+$PY /tmp/probe.py "$KEY" on,degraded
 kill -TERM $AGENT
 wait $AGENT
 test -s /var/lib/$NAME/state.json

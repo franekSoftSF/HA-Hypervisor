@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from .config import AgentConfig
-from .protocol import CLUSTER_DEGRADED, CLUSTER_OFF, CLUSTER_ON
+from .protocol import CLUSTER_DEGRADED, CLUSTER_NOT_CONFIGURED, CLUSTER_OFF, CLUSTER_ON
 from .store import Store
 from .vim import Infra, VimClient, VimError, VimUnavailable
 
@@ -86,7 +86,7 @@ def remember(view: View, config: AgentConfig, store: Store) -> None:
     known.update(view.vms)
     store.set("vms", known)
 
-    name = config.vcenter.vm_name
+    name = config.vcenter_vm_name
     vcenter_vm = next((vm for vm in view.vms.values() if vm["name"] == name), None)
     if vcenter_vm is not None and vcenter_vm.get("host"):
         store.set("vcenter_host", vcenter_vm["host"])
@@ -111,7 +111,9 @@ def _down_host(name: str, power: str) -> dict[str, Any]:
 
 
 def cluster_state(config: AgentConfig, view: View) -> str:
-    """Return on, degraded or off."""
+    """Return on, degraded, off or not_configured."""
+    if not config.configured:
+        return CLUSTER_NOT_CONFIGURED
     connected = {name for name, host in view.hosts.items() if host["connected"]}
     if view.source == SOURCE_VCENTER and all(h.name in connected for h in config.hosts):
         return CLUSTER_ON
@@ -147,7 +149,7 @@ def build_state(
                 "uptime_s": 0,
             }
 
-    protected = set(config.protected_vms) | {config.vcenter.vm_name}
+    protected = set(config.protected_vms) | {config.vcenter_vm_name}
     for vm in vms.values():
         vm["system"] = is_system_vm(vm)
         vm["protected"] = vm["name"] in protected
