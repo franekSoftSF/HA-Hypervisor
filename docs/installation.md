@@ -196,7 +196,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.7.0
+VERSION=0.8.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -371,6 +371,11 @@ Hosts, VMs and datastores appear as devices within one polling interval.
 ### Scenarios
 
 On the integration page choose **Add scenario**, enter a name, and add groups of VMs one by one.
+
+Each scenario has a **Running** switch: on starts it, off stops it, and it stays on while the scenario is active or
+partly active. The Start and Stop buttons remain for automations. **CPU**, **Memory** and **Storage** sensors add up
+what the VMs of the scenario use, with the value of each VM as an attribute. In the panel each scenario shows its
+state (tap to switch it), the sums and its VMs; the tile of a running VM shows its CPU, memory and disk.
 
 ![Scenario wizard](images/en/scenario-wizard.png)
 

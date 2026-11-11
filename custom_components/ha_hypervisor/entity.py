@@ -12,6 +12,7 @@ from homeassistant.helpers.entity import Entity
 
 from .const import CONF_POWER_OFF_EMPTY, CONF_SNAPSHOT, CONF_STEPS, DOMAIN, SUBENTRY_SCENARIO
 from .link import AgentLink
+from .protocol import CMD_SCENARIO_START, OP_FAILED, OP_RUNNING
 
 SECTION_HOSTS = "hosts"
 SECTION_VMS = "vms"
@@ -61,6 +62,36 @@ def scenario_subentries(entry: ConfigEntry) -> list[ConfigSubentry]:
         for subentry in entry.subentries.values()
         if subentry.subentry_type == SUBENTRY_SCENARIO
     ]
+
+
+SCENARIO_INACTIVE = "inactive"
+SCENARIO_STARTING = "starting"
+SCENARIO_STOPPING = "stopping"
+SCENARIO_ACTIVE = "active"
+SCENARIO_PARTIAL = "partial"
+SCENARIO_FAILED = "failed"
+
+
+def scenario_vms(subentry: ConfigSubentry) -> list[str]:
+    """Return the VM ids of a scenario, in start order, each once."""
+    return list(
+        dict.fromkeys(vm for step in subentry.data[CONF_STEPS] for vm in step["vms"])
+    )
+
+
+def scenario_status(link: AgentLink, subentry: ConfigSubentry) -> str:
+    """Return inactive, starting, stopping, active, partial or failed."""
+    operation = link.operation or {}
+    if operation.get("scenario") == subentry.subentry_id:
+        starting = operation.get("kind") == CMD_SCENARIO_START
+        if operation.get("status") == OP_RUNNING:
+            return SCENARIO_STARTING if starting else SCENARIO_STOPPING
+        if operation.get("status") == OP_FAILED:
+            return SCENARIO_FAILED
+    status = (link.state or {}).get("scenarios", {}).get(subentry.subentry_id)
+    if status is None or status["vms_on"] == 0:
+        return SCENARIO_INACTIVE
+    return SCENARIO_ACTIVE if status["vms_on"] == status["vms_total"] else SCENARIO_PARTIAL
 
 
 def scenario_payload(subentry: ConfigSubentry) -> dict[str, Any]:

@@ -13,6 +13,7 @@ const TEXT = {
     vmsCount: (on, total) => `${on} of ${total} running`,
     cpu: "CPU",
     memory: "Memory",
+    storage: "Storage",
     scenarios: "Scenarios",
     offline: "agent offline",
     empty: "No agent is set up yet.",
@@ -29,6 +30,7 @@ const TEXT = {
     vmsCount: (on, total) => `włączone ${on} z ${total}`,
     cpu: "CPU",
     memory: "Pamięć",
+    storage: "Dysk",
     scenarios: "Scenariusze",
     offline: "agent offline",
     empty: "Nie dodano jeszcze żadnego agenta.",
@@ -78,6 +80,11 @@ const tile = (entity, nameType = "entity", extra = {}) => ({
   name: { type: nameType },
   ...extra,
 });
+
+// A VM: running ones show CPU, memory and disk (the icon colour tells it is on),
+// stopped ones their state and disk.
+const vmTile = (entity, on) =>
+  tile(entity, "device", { state_content: on ? ["cpu", "memory", "disk"] : ["state", "disk"] });
 
 // The card helpers exist only once the dashboard code is loaded, which does
 // not happen when the browser opens this panel first.
@@ -315,23 +322,40 @@ class HaHypervisorPanel extends HTMLElement {
     ]);
     add(t.hosts, hosts);
 
-    const scenarios = agent.scenarios.flatMap((scenario) => [
-      {
-        min: 200,
-        tiles: [
-          scenario.entities.scenario_state && tile(scenario.entities.scenario_state, "device"),
-        ].filter(Boolean),
-      },
-      {
-        min: 110,
-        fit: true,
-        tight: true,
-        tiles: [
-        scenario.entities.scenario_start && press(scenario.entities.scenario_start),
-        scenario.entities.scenario_stop && press(scenario.entities.scenario_stop),
-        ].filter(Boolean),
-      },
-    ]);
+    // Each scenario: its state, which also switches it on and off, what its VMs
+    // use together, and the VMs themselves with their power state.
+    const scenarios = agent.scenarios.flatMap((scenario) => {
+      const { scenario_state: state, scenario_power: power } = scenario.entities;
+      const toggle = power && {
+        tap_action: {
+          action: "perform-action",
+          perform_action: "switch.toggle",
+          target: { entity_id: power },
+        },
+        icon_tap_action: {
+          action: "perform-action",
+          perform_action: "switch.toggle",
+          target: { entity_id: power },
+        },
+      };
+      const head = state ? tile(state, "device", toggle || {}) : power && tile(power, "device");
+      const usage = [
+        ["scenario_cpu", t.cpu],
+        ["scenario_memory", t.memory],
+        ["scenario_storage", t.storage],
+      ]
+        .filter(([key]) => scenario.entities[key])
+        .map(([key, name]) => tile(scenario.entities[key], "entity", { name }));
+      return [
+        { min: 200, tiles: [head].filter(Boolean) },
+        { min: 90, fit: true, tight: true, tiles: usage },
+        {
+          min: 260,
+          tight: true,
+          tiles: (scenario.vms || []).map((entity) => vmTile(entity, this._isOn(entity))),
+        },
+      ];
+    });
     add(t.scenarios, scenarios);
 
     const datastores = agent.datastores
@@ -345,7 +369,7 @@ class HaHypervisorPanel extends HTMLElement {
     const off = vms.filter((vm) => !this._isOn(vm.entities.vm_power));
     add(
       `${t.vms} · ${t.vmsCount(on.length, vms.length)}`,
-      [{ min: 200, tiles: [...on, ...off].map((vm) => tile(vm.entities.vm_power, "device")) }],
+      [{ min: 260, tiles: [...on, ...off].map((vm) => vmTile(vm.entities.vm_power, this._isOn(vm.entities.vm_power))) }],
       { full: true },
     );
     return sections;

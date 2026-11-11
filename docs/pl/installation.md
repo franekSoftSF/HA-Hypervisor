@@ -196,7 +196,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.7.0
+VERSION=0.8.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -370,6 +370,12 @@ Hosty, maszyny i datastore'y pojawią się jako urządzenia w ciągu jednego cyk
 ### Scenariusze
 
 Na stronie integracji wybierz **Dodaj scenariusz**, podaj nazwę i kolejno dodawaj grupy maszyn.
+
+Każdy scenariusz ma przełącznik **Uruchomiony**: włączenie uruchamia scenariusz, wyłączenie go zatrzymuje, a przełącznik jest
+włączony, dopóki scenariusz jest aktywny lub częściowo aktywny. Przyciski Uruchom i Zatrzymaj zostają dla automatyzacji.
+Czujniki **CPU**, **Pamięć** i **Dysk** sumują zużycie maszyn scenariusza, z wartością każdej maszyny w atrybucie.
+W panelu każdy scenariusz pokazuje stan (dotknięcie go przełącza), sumy i swoje maszyny; kafelek działającej maszyny
+pokazuje jej CPU, pamięć i dysk.
 
 ![Kreator scenariusza](../images/pl/scenario-wizard.png)
 

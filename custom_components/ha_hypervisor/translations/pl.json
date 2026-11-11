@@ -158,6 +158,9 @@
           "snapshot_delete": "Usuwanie migawek"
         }
       },
+      "scenario_cpu": { "name": "CPU" },
+      "scenario_memory": { "name": "Pamięć" },
+      "scenario_storage": { "name": "Dysk" },
       "scenario_state": {
         "name": "Stan",
         "state": {
@@ -180,7 +183,8 @@
     },
     "switch": {
       "shutdown_armed": { "name": "Odbezpiecz wyłączenie klastra" },
-      "vm_power": { "name": "Zasilanie" }
+      "vm_power": { "name": "Zasilanie" },
+      "scenario_power": { "name": "Uruchomiony" }
     }
   },
   "issues": {

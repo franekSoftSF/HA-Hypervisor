@@ -158,6 +158,9 @@
           "snapshot_delete": "Deleting snapshots"
         }
       },
+      "scenario_cpu": { "name": "CPU" },
+      "scenario_memory": { "name": "Memory" },
+      "scenario_storage": { "name": "Storage" },
       "scenario_state": {
         "name": "State",
         "state": {
@@ -180,7 +183,8 @@
     },
     "switch": {
       "shutdown_armed": { "name": "Arm cluster shutdown" },
-      "vm_power": { "name": "Power" }
+      "vm_power": { "name": "Power" },
+      "scenario_power": { "name": "Running" }
     }
   },
   "issues": {

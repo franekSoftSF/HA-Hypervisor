@@ -30,8 +30,16 @@ from .entity import (
     SECTION_VMS,
     ClusterEntity,
     ItemEntity,
+    SCENARIO_ACTIVE,
+    SCENARIO_FAILED,
+    SCENARIO_INACTIVE,
+    SCENARIO_PARTIAL,
+    SCENARIO_STARTING,
+    SCENARIO_STOPPING,
     ScenarioEntity,
+    scenario_status,
     scenario_subentries,
+    scenario_vms,
     track_items,
 )
 from .link import AgentLink
@@ -40,7 +48,6 @@ from .protocol import (
     CLUSTER_NOT_CONFIGURED,
     CLUSTER_OFF,
     CLUSTER_ON,
-    CMD_SCENARIO_START,
     OP_CANCELLED,
     OP_COMPLETED,
     OP_FAILED,
@@ -49,12 +56,6 @@ from .protocol import (
 )
 
 STATE_IDLE = "idle"
-SCENARIO_INACTIVE = "inactive"
-SCENARIO_STARTING = "starting"
-SCENARIO_STOPPING = "stopping"
-SCENARIO_ACTIVE = "active"
-SCENARIO_PARTIAL = "partial"
-SCENARIO_FAILED = "failed"
 
 
 def _percent(used: float, total: float) -> float | None:
@@ -223,7 +224,10 @@ async def async_setup_entry(
 
     for subentry in scenario_subentries(entry):
         async_add_entities(
-            [ScenarioStateSensor(link, subentry)],
+            [
+                ScenarioStateSensor(link, subentry),
+                *(ScenarioUsage(link, subentry, description) for description in SCENARIO_USAGE),
+            ],
             config_subentry_id=subentry.subentry_id,
         )
 
@@ -317,7 +321,8 @@ class OperationStepSensor(ClusterEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the step."""
-        return self.link.operation["step"] if self.link.operation_running else STATE_IDLE
+        step = (self.link.operation or {}).get("step")
+        return step if self.link.operation_running and step in STEPS else STATE_IDLE
 
 
 class ScenarioStateSensor(ScenarioEntity, SensorEntity):
@@ -341,17 +346,7 @@ class ScenarioStateSensor(ScenarioEntity, SensorEntity):
     @property
     def native_value(self) -> str:
         """Return the state."""
-        operation = self.link.operation or {}
-        if operation.get("scenario") == self._subentry.subentry_id:
-            starting = operation.get("kind") == CMD_SCENARIO_START
-            if operation.get("status") == OP_RUNNING:
-                return SCENARIO_STARTING if starting else SCENARIO_STOPPING
-            if operation.get("status") == OP_FAILED:
-                return SCENARIO_FAILED
-        status = (self.link.state or {}).get("scenarios", {}).get(self._subentry.subentry_id)
-        if status is None or status["vms_on"] == 0:
-            return SCENARIO_INACTIVE
-        return SCENARIO_ACTIVE if status["vms_on"] == status["vms_total"] else SCENARIO_PARTIAL
+        return scenario_status(self.link, self._subentry)
 
 
 class VmSnapshots(ItemEntity, SensorEntity):
@@ -372,3 +367,70 @@ class VmSnapshots(ItemEntity, SensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Return the names, oldest first."""
         return {"snapshots": list((self.item or {}).get("snapshots") or [])}
+
+
+@dataclass(frozen=True, kw_only=True)
+class UsageDescription(SensorEntityDescription):
+    """A sum over the VMs of a scenario."""
+
+    field: str
+
+
+SCENARIO_USAGE = (
+    UsageDescription(
+        key="scenario_cpu",
+        translation_key="scenario_cpu",
+        field="cpu_mhz",
+        native_unit_of_measurement=UnitOfFrequency.MEGAHERTZ,
+        device_class=SensorDeviceClass.FREQUENCY,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+    ),
+    UsageDescription(
+        key="scenario_memory",
+        translation_key="scenario_memory",
+        field="mem_mb",
+        native_unit_of_measurement=UnitOfInformation.MEBIBYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=0,
+    ),
+    UsageDescription(
+        key="scenario_storage",
+        translation_key="scenario_storage",
+        field="storage_gb",
+        native_unit_of_measurement=UnitOfInformation.GIBIBYTES,
+        device_class=SensorDeviceClass.DATA_SIZE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+    ),
+)
+
+
+class ScenarioUsage(ScenarioEntity, SensorEntity):
+    """CPU, memory or storage used by the VMs of a scenario, each VM as an attribute."""
+
+    entity_description: UsageDescription
+
+    def __init__(
+        self, link: AgentLink, subentry: ConfigSubentry, description: UsageDescription
+    ) -> None:
+        """Set the identity."""
+        super().__init__(link, subentry, description.key)
+        self.entity_description = description
+
+    def _vms(self) -> list[dict[str, Any]]:
+        return [vm for vm_id in scenario_vms(self._subentry) if (vm := self.link.item("vms", vm_id))]
+
+    @property
+    def native_value(self) -> float:
+        """Return the sum over the VMs the agent reports."""
+        field = self.entity_description.field
+        total = sum(vm.get(field) or 0 for vm in self._vms())
+        return round(total, 2) if isinstance(total, float) else total
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the value of each VM."""
+        field = self.entity_description.field
+        return {"vms": {vm["name"]: vm.get(field) or 0 for vm in self._vms()}}

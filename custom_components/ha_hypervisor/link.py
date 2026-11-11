@@ -220,7 +220,11 @@ class AgentLink:
     def _notify(self) -> None:
         # A listener can add entities, which register new listeners.
         for listener in list(self._listeners):
-            listener()
+            try:
+                listener()
+            except Exception:
+                # One broken entity must not freeze all the others.
+                _LOGGER.exception("Updating from agent %s failed", self.agent_id)
 
     @property
     def is_proxmox(self) -> bool:

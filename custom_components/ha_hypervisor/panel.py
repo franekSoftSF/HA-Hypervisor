@@ -20,6 +20,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN
+from .entity import scenario_vms
 
 PANEL_URL = "hypervisor"
 PANEL_ELEMENT = "ha-hypervisor-panel"
@@ -135,6 +136,12 @@ def build_dashboard(hass: HomeAssistant) -> dict[str, Any]:
             target = records.get(entity.device_id or "")
             if target is not None:
                 target[entity.translation_key] = entity.entity_id
+        # The VMs of each scenario, in start order, as their power switches.
+        power = {vm["id"]: vm["entities"].get("vm_power") for vm in agent["vms"]}
+        for scenario in agent["scenarios"]:
+            subentry = entry.subentries.get(scenario["id"])
+            vm_ids = scenario_vms(subentry) if subentry else []
+            scenario["vms"] = [power[vm] for vm in vm_ids if power.get(vm)]
         for kind in ("hosts", "vms", "datastores", "scenarios"):
             agent[kind].sort(key=lambda record: record["name"].casefold())
         agents.append(agent)

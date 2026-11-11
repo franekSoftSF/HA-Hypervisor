@@ -1,6 +1,6 @@
 # Status
 
-Version 0.7.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
+Version 0.8.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
@@ -17,6 +17,7 @@ Version 0.7.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
   start possible. An agent in a guest of the same node is not supported.
 - Hosts without BMC or Wake on LAN: manual_power_on (CLI --manual-power-on) allows the shutdown, the start waits
   for the power button. Compact panel layout: overview row, control grid, one VM list running first.
+- Scenario switch (on starts, off stops), scenario CPU/memory/storage sums, VM usage on the panel tiles.
 - Repairs after every start: agent not answering within a minute, agent older than the integration.
 - Tests in Docker on the real Home Assistant 2026.11 image, hassfest, end-to-end stack with `vcsim`.
 
@@ -51,3 +52,5 @@ The user runs two agents: one for vCenter, one for Proxmox (now possible with `-
    order, each step sent to the agent that owns the VM.
 3. Schedules and automations: the existing switches, buttons and actions already work in HA automations; add
    actions that report completion (wait for the operation) and examples or blueprints, e.g. shut VMs down after a task.
+4. Discussed, not started (2026-11-11): Intel AMT power control for the HP EliteDesk 800 G2 running Proxmox, and
+   hardware sensors from BMCs over Redfish (iDRAC, iLO, Supermicro): temperatures, power draw, fans, health.
