@@ -1,6 +1,6 @@
 # Status
 
-Version 0.10.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
+Version 0.10.1, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.

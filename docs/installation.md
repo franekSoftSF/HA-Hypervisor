@@ -196,7 +196,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.10.0
+VERSION=0.10.1
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -390,7 +390,9 @@ The integration adds **Hypervisor** to the sidebar by itself. The panel is built
 in two tabs. **Overview**: one card per agent with the cluster numbers and its controls (start, preview, unlock and shut
 down, cancel, refresh), then one card per server with its CPU, memory and every VM it runs, then the datastores. A VM
 that moves to another server moves to its card. **Scenarios**: one card per scenario. New servers, VMs and scenarios
-show up without any editing; with several agents each gets its own block.
+show up without any editing; with several agents each gets its own block. Active agents, servers and scenarios come
+first, inactive ones drop to the bottom. VMs without a server sit under **Other virtual machines**, folded until you
+open it.
 
 ![Hypervisor panel](images/en/dashboard.png)
 

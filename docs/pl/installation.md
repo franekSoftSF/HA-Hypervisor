@@ -196,7 +196,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.10.0
+VERSION=0.10.1
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -391,7 +391,8 @@ w dwóch zakładkach. **Przegląd**: karta każdego agenta z liczbami klastra i 
 i wyłącz, anuluj, odśwież), potem karta każdego serwera z jego CPU, pamięcią i wszystkimi maszynami, które na nim
 działają, na końcu magazyny danych. Maszyna przeniesiona na inny serwer przechodzi do jego karty. **Scenariusze**: karta
 każdego scenariusza. Nowe serwery, maszyny i scenariusze pojawiają się bez żadnej edycji; przy kilku agentach każdy ma
-swój blok.
+swój blok. Aktywne agenty, serwery i scenariusze są na górze, nieaktywne spadają na dół. Maszyny bez serwera są w
+zwiniętej sekcji **Pozostałe maszyny wirtualne**, którą rozwija się kliknięciem.
 
 ![Panel Hypervisor](../images/pl/dashboard.png)
 

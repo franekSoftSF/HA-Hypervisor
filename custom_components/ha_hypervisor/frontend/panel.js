@@ -109,6 +109,8 @@ const TEXT = {
 
 const TABS = ["overview", "scenarios"];
 const TAB_STORAGE = "ha-hypervisor-panel-tab";
+// Sections the user opened; everything listed here is folded by default.
+const OPEN_STORAGE = "ha-hypervisor-panel-open";
 const LOG_LINES = 2000;
 
 const GREEN = "var(--success-color, #43a047)";
@@ -154,6 +156,23 @@ function readTab() {
     return TABS.includes(saved) ? saved : "overview";
   } catch (_err) {
     return "overview";
+  }
+}
+
+function readOpen() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(OPEN_STORAGE) || "[]");
+    return new Set(Array.isArray(saved) ? saved : []);
+  } catch (_err) {
+    return new Set();
+  }
+}
+
+function saveOpen(open) {
+  try {
+    window.localStorage.setItem(OPEN_STORAGE, JSON.stringify([...open]));
+  } catch (_err) {
+    // Private window: the folding is simply not remembered.
   }
 }
 
@@ -220,6 +239,22 @@ const STYLE = `
     color: var(--secondary-text-color);
     margin: 24px 4px 10px;
   }
+  .fold {
+    appearance: none;
+    border: none;
+    background: none;
+    font-family: inherit;
+    width: calc(100% - 8px);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+  }
+  .fold .chevron { transition: transform 0.15s; display: inline-block; }
+  .fold[aria-expanded="true"] .chevron { transform: rotate(90deg); }
+  .fold .count { font-size: 13px; font-weight: 400; }
   .badge { font-size: 13px; color: var(--error-color); font-weight: 400; }
   .card {
     background: var(--card-background-color, var(--ha-card-background));
@@ -335,6 +370,29 @@ class HaHypervisorPanel extends HTMLElement {
     this._tab = readTab();
     this._logBusy = {};
     this._logError = {};
+    this._open = readOpen();
+  }
+
+  // A heading that folds the content under it; folded until opened, remembered per browser.
+  _fold(key, title, summary, content) {
+    const open = this._open.has(key);
+    const button = el(
+      "button",
+      {
+        class: "heading fold",
+        "aria-expanded": String(open),
+        onclick: () => {
+          if (this._open.has(key)) this._open.delete(key);
+          else this._open.add(key);
+          saveOpen(this._open);
+          this._build();
+        },
+      },
+      el("span", { class: "chevron" }, "▸"),
+      el("span", {}, title),
+      el("span", { class: "count" }, summary),
+    );
+    return open ? [button, content()] : [button];
   }
 
   set hass(hass) {
@@ -656,6 +714,30 @@ class HaHypervisorPanel extends HTMLElement {
     return rows.sort((a, b) => Number(b.on) - Number(a.on) || a.name.localeCompare(b.name));
   }
 
+  // Active first, the rest drops to the bottom; the layout already comes sorted by name.
+  _activeFirst(items, active) {
+    return items
+      .map((item, index) => ({ item, index, active: active(item) }))
+      .sort((a, b) => Number(b.active) - Number(a.active) || a.index - b.index)
+      .map(({ item }) => item);
+  }
+
+  _hostActive(host) {
+    return this._state(host.entities.host_power)?.state === "on";
+  }
+
+  _scenarioActive(scenario) {
+    const { scenario_state: stateEntity, scenario_power: power } = scenario.entities;
+    if (power) return this._isOn(power);
+    return ["active", "partial", "starting"].includes(this._state(stateEntity)?.state);
+  }
+
+  _agentActive(agent) {
+    if (!agent.online) return false;
+    const state = this._state(agent.cluster.cluster_state)?.state;
+    return state !== "off" && (agent.hosts.length === 0 || agent.hosts.some((host) => this._hostActive(host)));
+  }
+
   // ------------------------------------------------------------- overview tab
 
   // The agent: cluster state in numbers, the controls, the reason of a failure.
@@ -828,7 +910,7 @@ class HaHypervisorPanel extends HTMLElement {
 
   _renderOverview(content) {
     const t = this._text;
-    const agents = this._layout.agents;
+    const agents = this._activeFirst(this._layout.agents, (agent) => this._agentActive(agent));
     const blocks = agents.map((agent) => {
       const block = el("div", { class: "agent" }, this._agentCard(agent));
       const rows = this._vmRows(
@@ -837,7 +919,7 @@ class HaHypervisorPanel extends HTMLElement {
       const placed = new Set();
       if (agent.hosts.length) {
         block.append(el("div", { class: "heading" }, `${t.servers} · ${agent.hosts.length}`));
-        for (const host of agent.hosts) {
+        for (const host of this._activeFirst(agent.hosts, (item) => this._hostActive(item))) {
           const mine = rows.filter((row) => row.host && (row.host === host.id || row.host === host.name));
           mine.forEach((row) => placed.add(row));
           block.append(this._serverCard(agent, host, mine));
@@ -845,8 +927,12 @@ class HaHypervisorPanel extends HTMLElement {
       }
       const others = rows.filter((row) => !placed.has(row));
       if (others.length) {
-        block.append(el("div", { class: "heading" }, t.otherVms));
-        block.append(el("div", { class: "card" }, this._vmTable(this._sortRows(others), this._running(agent) || !agent.online)));
+        const on = others.filter((row) => row.on).length;
+        block.append(
+          ...this._fold(`others:${agent.entry_id}`, t.otherVms, t.vmsOn(on, others.length), () =>
+            el("div", { class: "card" }, this._vmTable(this._sortRows(others), this._running(agent) || !agent.online)),
+          ),
+        );
       }
       if (agent.datastores.some((store) => store.entities.datastore_used_percent)) {
         block.append(el("div", { class: "heading" }, t.datastores), this._datastoreCard(agent));
@@ -914,14 +1000,16 @@ class HaHypervisorPanel extends HTMLElement {
 
   _renderScenarios(content) {
     const t = this._text;
-    const agents = this._layout.agents;
+    const agents = this._activeFirst(this._layout.agents, (agent) => this._agentActive(agent));
     const blocks = agents.map((agent) => {
       const block = el("div", { class: "agent" });
       if (agents.length > 1 || !agent.online) {
         block.append(el("div", { class: "heading" }, agent.title, " ", !agent.online && el("span", { class: "badge" }, t.offline)));
       }
       if (!agent.scenarios.length) block.append(el("div", { class: "message" }, t.noScenarios));
-      for (const scenario of agent.scenarios) block.append(this._scenarioCard(agent, scenario));
+      for (const scenario of this._activeFirst(agent.scenarios, (item) => this._scenarioActive(item))) {
+        block.append(this._scenarioCard(agent, scenario));
+      }
       return block;
     });
     content.replaceChildren(...blocks);
