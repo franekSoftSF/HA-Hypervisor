@@ -10,6 +10,17 @@ New-Item -ItemType Directory -Force $dist | Out-Null
 docker run --rm -v "${root}:/src:ro" -v "${dist}:/out" python:3.14-slim sh /src/packaging/deb/build.sh
 if ($LASTEXITCODE -ne 0) { Write-Host 'BUILD FAILED'; exit 1 }
 
+# The tests see only the package just built: dist keeps older versions too,
+# and a glob over all of them would install whichever apt picks.
+$version = (Select-String -Path "$root\agent\ha_hypervisor_agent\__init__.py" -Pattern '__version__ = "(.+)"').Matches[0].Groups[1].Value
+$current = Join-Path $dist 'test'
+Remove-Item -Recurse -Force $current -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force $current | Out-Null
+Copy-Item "$dist\ha-hypervisor-agent_${version}_*.deb*" $current
+if (-not (Get-ChildItem "$current\*.deb")) { Write-Host "NO PACKAGE FOR $version"; exit 1 }
+Write-Host "=== testing $version"
+$dist = $current
+
 docker compose -f $compose up -d --build mosquitto vcsim esxi pve 2>&1 | Out-Null
 Start-Sleep -Seconds 3
 

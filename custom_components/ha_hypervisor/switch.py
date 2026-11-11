@@ -48,21 +48,32 @@ async def async_setup_entry(
         )
 
 
-def _gib(mib: float) -> str:
-    return f"{mib / 1024:.1f}"
+# Languages writing 1.5 as 1,5. The tile shows these texts as they are.
+_COMMA_LANGUAGES = frozenset(
+    "bg cs da de el es et fi fr hr hu id it lt lv nb nl pl pt ro ru sk sl sr sv tr uk".split()
+)
+USAGE_NUMBERS = ("cpu_mhz", "mem_mb", "mem_total_mb", "storage_gb")
 
 
-def usage_texts(vm: dict[str, Any]) -> dict[str, str]:
+def _number(value: float, comma: bool) -> str:
+    text = f"{value:.1f}"
+    return text.replace(".", ",") if comma else text
+
+
+def usage_texts(vm: dict[str, Any], language: str = "en") -> dict[str, str]:
     """Return CPU, memory and disk of a VM as short texts, CPU and memory only while it runs."""
+    comma = language.split("-")[0].lower() in _COMMA_LANGUAGES
     texts: dict[str, str] = {}
     if vm.get("power") == "on":
         texts["cpu"] = f"CPU {vm.get('cpu_mhz') or 0} MHz"
         used, total = vm.get("mem_mb") or 0, vm.get("mem_total_mb") or 0
         texts["memory"] = (
-            f"RAM {_gib(used)} / {_gib(total)} GiB" if total else f"RAM {_gib(used)} GiB"
+            f"RAM {_number(used / 1024, comma)} / {_number(total / 1024, comma)} GiB"
+            if total
+            else f"RAM {_number(used / 1024, comma)} GiB"
         )
     if vm.get("storage_gb") is not None:
-        texts["disk"] = f"{vm['storage_gb']:.1f} GiB"
+        texts["disk"] = f"{_number(vm['storage_gb'], comma)} GiB"
     return texts
 
 
@@ -96,7 +107,7 @@ class VmPower(ItemEntity, SwitchEntity):
     _attr_device_class = SwitchDeviceClass.SWITCH
     # Shown on the panel tiles; they change with every poll and would only
     # fill the recorder, the VM sensors keep the history.
-    _unrecorded_attributes = frozenset({"cpu", "memory", "disk"})
+    _unrecorded_attributes = frozenset({"cpu", "memory", "disk", "host", *USAGE_NUMBERS})
 
     def __init__(self, link: AgentLink, item: dict[str, Any]) -> None:
         """Set the identity."""
@@ -108,9 +119,17 @@ class VmPower(ItemEntity, SwitchEntity):
         return bool(self.item and self.item["power"] == "on")
 
     @property
-    def extra_state_attributes(self) -> dict[str, str]:
-        """Return the usage as short texts for the panel: CPU, memory, disk."""
-        return usage_texts(self.item or {})
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return the usage for the panel: short texts for the tiles, numbers for the tables."""
+        item = self.item or {}
+        attributes: dict[str, Any] = usage_texts(item, self.hass.config.language)
+        if item.get("host"):
+            # The server it runs on: the panel groups the VMs by server.
+            attributes["host"] = item["host"]
+        for key in USAGE_NUMBERS:
+            if item.get(key) is not None:
+                attributes[key] = item[key]
+        return attributes
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
         """Power on."""

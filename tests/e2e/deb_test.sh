@@ -11,6 +11,7 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq >/dev/null
 apt-get install -y -qq --no-install-recommends "/debs/${NAME}_"*"_$(dpkg --print-architecture).deb" >/dev/null
 echo "installed: $($NAME --version)"
+test "$(ls /debs/*.deb | wc -l)" = 1
 
 test "$(stat -c '%U:%G %a' /etc/$NAME)" = "root:$NAME 750"
 test "$(stat -c '%U %a' /var/lib/$NAME)" = "$NAME 750"

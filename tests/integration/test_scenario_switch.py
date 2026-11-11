@@ -105,3 +105,28 @@ async def test_vm_switch_carries_usage_for_the_panel(hass, agent):
     assert web.attributes["disk"] == "10.5 GiB"
     db = hass.states.get(entity(hass, "switch", f"{AGENT}_vms_vm-2_power"))
     assert "cpu" not in db.attributes and "disk" in db.attributes  # off: only the disk
+
+
+async def test_panel_lists_scenario_members_with_names(hass, agent, hass_ws_client):
+    await setup_entry(hass, agent, subentry())
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": f"{DOMAIN}/dashboard"})
+    (lab,) = (await client.receive_json())["result"]["agents"]
+    (scenario,) = lab["scenarios"]
+    assert [(m["id"], m["name"]) for m in scenario["members"]] == [("vm-2", "db"), ("vm-1", "web")]
+    assert scenario["members"][0]["power"] == entity(hass, "switch", f"{AGENT}_vms_vm-2_power")
+
+
+async def test_vm_switch_numbers_and_decimal_comma(hass, agent):
+    hass.config.language = "pl"
+    await setup_entry(hass, agent)
+    document = state_doc()
+    vms = {vm["id"]: vm for vm in document["vms"]}
+    vms["vm-1"].update(cpu_mhz=300, mem_mb=1536, mem_total_mb=4096, storage_gb=15.0)
+    agent.fire("state", "state", document)
+    await hass.async_block_till_done()
+    web = hass.states.get(entity(hass, "switch", f"{AGENT}_vms_vm-1_power"))
+    assert web.attributes["memory"] == "RAM 1,5 / 4,0 GiB"
+    assert web.attributes["disk"] == "15,0 GiB"
+    assert web.attributes["mem_mb"] == 1536 and web.attributes["storage_gb"] == 15.0
+    assert web.attributes["host"] == "esxi1"  # the panel groups the VMs by server

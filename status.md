@@ -1,6 +1,6 @@
 # Status
 
-Version 0.9.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
+Version 0.10.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
@@ -18,6 +18,10 @@ Version 0.9.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
 - Hosts without BMC or Wake on LAN: manual_power_on (CLI --manual-power-on) allows the shutdown, the start waits
   for the power button. Compact panel layout: overview row, control grid, one VM list running first.
 - Scenario switch (on starts, off stops), scenario CPU/memory/storage sums, VM usage on the panel tiles.
+- Panel of cards in two tabs: Overview (agent with controls, one card per server with its VMs, datastores) and
+  Scenarios (one card per scenario with a per VM usage table). Reason of the last failed
+  operation on the Overview tab. Agent log in HA: the agent keeps its last 2000 log lines in memory (logbuffer.py),
+  the logs command returns them, the panel downloads them and the diagnostics include them.
 - Repairs after every start: agent not answering within a minute, agent older than the integration.
 - Agent self update: `update` downloads the release package for the machine, checks its .sha256 and installs it;
   `update --file` installs a downloaded package; `autoupdate enable` turns on a daily systemd timer. Updates wait

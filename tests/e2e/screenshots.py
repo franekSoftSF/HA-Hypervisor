@@ -164,12 +164,27 @@ def capture(page: Page, language: str, entry_id: str) -> None:
     labels = LANGUAGES[language]
     set_language(page, language, entry_id)
 
-    page.set_viewport_size({"width": 1500, "height": 820})
+    page.set_viewport_size({"width": 1100, "height": 1080})
     page.goto(f"{BASE}/{PANEL}")
     settle(page, 6)
-    tiles = page.locator("ha-hypervisor-panel hui-tile-card").count()
-    assert tiles > 20, f"panel shows {tiles} tiles"
+    cards = page.locator("ha-hypervisor-panel .card").count()
+    assert cards == 3, f"overview shows {cards} cards"  # agent, the server, datastores
+    rows = page.locator("ha-hypervisor-panel .card tbody tr").count()
+    assert rows == 4, f"overview tables show {rows} rows"  # 3 VMs on the server, 1 datastore
     shot(page, language, "dashboard")
+
+    # The scenarios tab; back to the overview afterwards, the panel remembers the tab.
+    page.set_viewport_size({"width": 1100, "height": 860})
+    tabs = page.locator("ha-hypervisor-panel .tab")
+    tabs.nth(1).click()
+    settle(page, 2)
+    cards = page.locator("ha-hypervisor-panel .card").count()
+    assert cards == 2, f"scenarios tab shows {cards} cards"
+    rows = page.locator("ha-hypervisor-panel .card tbody tr").count()
+    assert rows == 4, f"scenario tables show {rows} VMs"
+    shot(page, language, "scenarios")
+    tabs.nth(0).click()
+    settle(page, 2)
 
     page.set_viewport_size({"width": 1400, "height": 1320})
     page.goto(f"{BASE}/config/integrations/integration/ha_hypervisor")

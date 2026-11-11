@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -260,3 +261,48 @@ def test_service_rejects_wrong_key(service):
 
 def test_broker_settings_never_queue_commands(service):
     assert service._client._clean_session is True  # noqa: SLF001
+
+
+def test_log_buffer_keeps_the_newest_lines():
+    from ha_hypervisor_agent.logbuffer import LogBuffer
+
+    buffer = LogBuffer(capacity=3)
+    logger = logging.getLogger("test.logbuffer")
+    logger.addHandler(buffer)
+    logger.setLevel(logging.INFO)
+    try:
+        for number in range(5):
+            logger.info("line %d", number)
+        try:
+            raise ValueError("boom")
+        except ValueError:
+            logger.exception("crashed")
+    finally:
+        logger.removeHandler(buffer)
+    lines = buffer.lines(10)
+    assert len(lines) == 3
+    assert lines[-1] == "ValueError: boom"  # the traceback is kept, line by line
+    assert buffer.lines(1) == ["ValueError: boom"]
+
+
+def test_logs_command_returns_the_agent_log(service, monkeypatch):
+    from ha_hypervisor_agent import service as service_module
+    from ha_hypervisor_agent.logbuffer import LogBuffer
+    from ha_hypervisor_agent.operations import OperationFailed
+
+    buffer = LogBuffer()
+    monkeypatch.setattr(service_module, "LOG_BUFFER", buffer)
+    logger = logging.getLogger("test.logs")
+    logger.addHandler(buffer)
+    logger.setLevel(logging.INFO)
+    try:
+        logger.error("Operation failed: esxi_unavailable")
+        logger.info("second")
+    finally:
+        logger.removeHandler(buffer)
+    lines = service._execute("logs", {"lines": 5})["lines"]  # noqa: SLF001
+    assert "ERROR   test.logs: Operation failed: esxi_unavailable" in lines[0]
+    assert service._execute("logs", {"lines": 1})["lines"][0].endswith("second")  # noqa: SLF001
+    assert len(service._execute("logs", {})["lines"]) == 2  # noqa: SLF001
+    with pytest.raises(OperationFailed):
+        service._execute("logs", {"lines": "all"})  # noqa: SLF001

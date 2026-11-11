@@ -109,3 +109,38 @@ async def test_removing_the_agent_clears_its_repairs(hass, agent):
     assert await hass.config_entries.async_remove(entry.entry_id)
     await hass.async_block_till_done()
     assert ir.async_get(hass).async_get_issue(DOMAIN, f"agent_outdated_{AGENT}") is None
+
+
+async def test_agent_log_for_the_download_button(hass, agent, hass_ws_client):
+    entry = await setup_entry(hass, agent)
+    agent.answers["logs"] = {"lines": ["first", "Operation failed: esxi_unavailable"]}
+    client = await hass_ws_client(hass)
+    await client.send_json_auto_id({"type": f"{DOMAIN}/agent_log", "entry_id": entry.entry_id, "lines": 50})
+    response = await client.receive_json()
+    assert response["success"], response
+    assert response["result"]["lines"] == ["first", "Operation failed: esxi_unavailable"]
+    assert response["result"]["agent_id"] == AGENT
+    (command,) = [c for c in agent.commands() if c.kind == "logs"]
+    assert command.body == {"lines": 50}
+
+    # An agent older than the command answers unknown_command.
+    agent.answers["logs"] = {"ok": False, "code": "unknown_command"}
+    await client.send_json_auto_id({"type": f"{DOMAIN}/agent_log", "entry_id": entry.entry_id})
+    response = await client.receive_json()
+    assert not response["success"]
+    assert response["error"]["code"] == "agent_error"
+
+    await client.send_json_auto_id({"type": f"{DOMAIN}/agent_log", "entry_id": "nothing"})
+    assert (await client.receive_json())["error"]["code"] == "not_found"
+
+
+async def test_diagnostics_carry_the_agent_log(hass, agent):
+    from custom_components.ha_hypervisor.diagnostics import async_get_config_entry_diagnostics
+
+    entry = await setup_entry(hass, agent)
+    agent.answers["logs"] = {"lines": ["Operation failed: no_wake_method"]}
+    data = await async_get_config_entry_diagnostics(hass, entry)
+    assert data["agent_log"] == ["Operation failed: no_wake_method"]
+    agent.answers["logs"] = {"ok": False, "code": "unknown_command"}
+    data = await async_get_config_entry_diagnostics(hass, entry)
+    assert "agent_log" not in data and data["agent_log_error"]

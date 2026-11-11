@@ -196,7 +196,7 @@ Paczki dla Debiana 12 lub nowszego i Ubuntu 22.04 lub nowszego, na amd64 i arm64
 Pythona i nie rusza systemowego.
 
 ```bash
-VERSION=0.9.0
+VERSION=0.10.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -376,21 +376,31 @@ Na stronie integracji wybierz **Dodaj scenariusz**, podaj nazwę i kolejno dodaw
 Każdy scenariusz ma przełącznik **Uruchomiony**: włączenie uruchamia scenariusz, wyłączenie go zatrzymuje, a przełącznik jest
 włączony, dopóki scenariusz jest aktywny lub częściowo aktywny. Przyciski Uruchom i Zatrzymaj zostają dla automatyzacji.
 Czujniki **CPU**, **Pamięć** i **Dysk** sumują zużycie maszyn scenariusza, z wartością każdej maszyny w atrybucie.
-W panelu każdy scenariusz pokazuje stan (dotknięcie go przełącza), sumy i swoje maszyny; kafelek działającej maszyny
-pokazuje jej CPU, pamięć i dysk.
+Zakładka **Scenariusze** w panelu pokazuje każdy scenariusz jako osobną kartę: stan, Uruchom lub Zatrzymaj, trzy sumy
+i tabelę maszyn z CPU, pamięcią i dyskiem, każda wartość z paskiem udziału w scenariuszu, oraz przełącznik przy każdej
+maszynie.
+
+![Zakładka Scenariusze](../images/pl/scenarios.png)
 
 ![Kreator scenariusza](../images/pl/scenario-wizard.png)
 
 ### Panel
 
-Integracja sama dodaje **Hypervisor** do menu bocznego. Panel powstaje z tego, co zgłaszają agenci: klaster, przyciski
-sterowania, hosty, włączone i wyłączone maszyny, scenariusze i magazyny danych. Nowe maszyny pojawiają się bez żadnej
-edycji, a maszyna przechodzi między „Włączone” i „Wyłączone” razem ze zmianą stanu. Przy kilku agentach każdy ma swój blok.
+Integracja sama dodaje **Hypervisor** do menu bocznego. Panel powstaje z tego, co zgłaszają agenci, i składa się z kart
+w dwóch zakładkach. **Przegląd**: karta każdego agenta z liczbami klastra i sterowaniem (uruchom, podgląd, odbezpiecz
+i wyłącz, anuluj, odśwież), potem karta każdego serwera z jego CPU, pamięcią i wszystkimi maszynami, które na nim
+działają, na końcu magazyny danych. Maszyna przeniesiona na inny serwer przechodzi do jego karty. **Scenariusze**: karta
+każdego scenariusza. Nowe serwery, maszyny i scenariusze pojawiają się bez żadnej edycji; przy kilku agentach każdy ma
+swój blok.
 
 ![Panel Hypervisor](../images/pl/dashboard.png)
 
 Aby go ukryć, przytrzymaj tytuł menu bocznego i ukryj pozycję. Jeśli wolisz własny panel, zacznij od
 [dashboard.example.yaml](../dashboard.example.yaml).
+
+Gdy ostatnia operacja się nie powiodła, zakładka Przegląd mówi która i dlaczego, słowami. **Pobierz log agenta** (dla
+administratorów, agent 0.10.0 lub nowszy) zapisuje ostatnie 2000 linii logu agenta do pliku, bez logowania się po SSH.
+Te same linie są w pobieranej diagnostyce integracji.
 
 ### Automatyzacje, Stream Deck i inne panele przycisków
 

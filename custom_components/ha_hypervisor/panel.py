@@ -16,11 +16,13 @@ from homeassistant.components import frontend, panel_custom, websocket_api
 from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr, entity_registry as er
 from homeassistant.loader import async_get_integration
 
 from .const import DOMAIN
 from .entity import scenario_vms
+from .protocol import LOG_LINES_DEFAULT, LOG_LINES_MAX
 
 PANEL_URL = "hypervisor"
 PANEL_ELEMENT = "ha-hypervisor-panel"
@@ -28,6 +30,7 @@ PANEL_TITLE = "Hypervisor"
 PANEL_ICON = "mdi:server-network"
 STATIC_URL = f"/{DOMAIN}_static"
 WS_DASHBOARD = f"{DOMAIN}/dashboard"
+WS_AGENT_LOG = f"{DOMAIN}/agent_log"
 _REGISTERED = f"{DOMAIN}_panel"
 
 _ITEM_SECTIONS = {"hosts", "vms", "datastores"}
@@ -36,6 +39,7 @@ _ITEM_SECTIONS = {"hosts", "vms", "datastores"}
 async def async_setup_panel_support(hass: HomeAssistant) -> None:
     """Serve the frontend module and answer the dashboard command, once."""
     websocket_api.async_register_command(hass, ws_dashboard)
+    websocket_api.async_register_command(hass, ws_agent_log)
     if hass.http is None:
         return
     await hass.http.async_register_static_paths(
@@ -138,10 +142,17 @@ def build_dashboard(hass: HomeAssistant) -> dict[str, Any]:
                 target[entity.translation_key] = entity.entity_id
         # The VMs of each scenario, in start order, as their power switches.
         power = {vm["id"]: vm["entities"].get("vm_power") for vm in agent["vms"]}
+        names = {vm["id"]: vm["name"] for vm in agent["vms"]}
         for scenario in agent["scenarios"]:
             subentry = entry.subentries.get(scenario["id"])
             vm_ids = scenario_vms(subentry) if subentry else []
             scenario["vms"] = [power[vm] for vm in vm_ids if power.get(vm)]
+            # The same VMs with their names, for the per VM table of the scenarios tab.
+            scenario["members"] = [
+                {"id": vm, "name": names.get(vm, vm), "power": power[vm]}
+                for vm in vm_ids
+                if power.get(vm)
+            ]
         for kind in ("hosts", "vms", "datastores", "scenarios"):
             agent[kind].sort(key=lambda record: record["name"].casefold())
         agents.append(agent)
@@ -156,3 +167,32 @@ def ws_dashboard(
 ) -> None:
     """Return the layout of the panel."""
     connection.send_result(msg["id"], build_dashboard(hass))
+
+
+@websocket_api.require_admin
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): WS_AGENT_LOG,
+        vol.Required("entry_id"): str,
+        vol.Optional("lines", default=LOG_LINES_DEFAULT): vol.All(
+            int, vol.Range(min=1, max=LOG_LINES_MAX)
+        ),
+    }
+)
+@websocket_api.async_response
+async def ws_agent_log(
+    hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the last lines of an agent log, for the download button of the panel."""
+    entry = hass.config_entries.async_get_entry(msg["entry_id"])
+    if entry is None or entry.domain != DOMAIN or entry.state is not ConfigEntryState.LOADED:
+        connection.send_error(msg["id"], websocket_api.ERR_NOT_FOUND, "No such agent")
+        return
+    try:
+        lines = await entry.runtime_data.async_agent_log(msg["lines"])
+    except HomeAssistantError as err:
+        connection.send_error(msg["id"], "agent_error", str(err))
+        return
+    connection.send_result(
+        msg["id"], {"agent_id": entry.runtime_data.agent_id, "title": entry.title, "lines": lines}
+    )

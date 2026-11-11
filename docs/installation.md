@@ -196,7 +196,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.9.0
+VERSION=0.10.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -376,21 +376,30 @@ On the integration page choose **Add scenario**, enter a name, and add groups of
 
 Each scenario has a **Running** switch: on starts it, off stops it, and it stays on while the scenario is active or
 partly active. The Start and Stop buttons remain for automations. **CPU**, **Memory** and **Storage** sensors add up
-what the VMs of the scenario use, with the value of each VM as an attribute. In the panel each scenario shows its
-state (tap to switch it), the sums and its VMs; the tile of a running VM shows its CPU, memory and disk.
+what the VMs of the scenario use, with the value of each VM as an attribute. The **Scenarios** tab of the panel shows
+each scenario as its own card: state, Start or Stop, the three sums, and a table of its VMs with CPU, memory and disk,
+each with a bar showing its share of the scenario, and a switch per VM.
+
+![Scenarios tab](images/en/scenarios.png)
 
 ![Scenario wizard](images/en/scenario-wizard.png)
 
 ### Dashboard
 
-The integration adds **Hypervisor** to the sidebar by itself. The panel is built from what the agents report: cluster,
-control buttons, hosts, running and stopped VMs, scenarios and datastores. New VMs show up without any editing, and a
-VM moves between "Running" and "Stopped" as its state changes. With several agents each gets its own block.
+The integration adds **Hypervisor** to the sidebar by itself. The panel is built from what the agents report, as cards
+in two tabs. **Overview**: one card per agent with the cluster numbers and its controls (start, preview, unlock and shut
+down, cancel, refresh), then one card per server with its CPU, memory and every VM it runs, then the datastores. A VM
+that moves to another server moves to its card. **Scenarios**: one card per scenario. New servers, VMs and scenarios
+show up without any editing; with several agents each gets its own block.
 
 ![Hypervisor panel](images/en/dashboard.png)
 
 To hide it, long-press the sidebar title and hide the entry. To build your own dashboard instead, start from
 [dashboard.example.yaml](dashboard.example.yaml).
+
+When the last operation failed, the Overview tab says which one and why, in words. **Download agent log** (for
+administrators, agent 0.10.0 or newer) saves the last 2000 lines of the agent log as a file, without SSH to the agent
+machine. The same lines are in the diagnostics download of the integration.
 
 ### Automations, Stream Deck and other button pads
 

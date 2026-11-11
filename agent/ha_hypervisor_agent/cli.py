@@ -32,7 +32,7 @@ from .config import (
 from .power import HostPower
 from .protocol import generate_key, is_valid_agent_id
 from .service import AgentService, check, check_power, test_mqtt
-from . import update
+from . import logbuffer, update
 from .vim import VimClient, VimError, VimUnavailable
 
 _GROUP = "ha-hypervisor-agent"
@@ -671,9 +671,10 @@ def cmd_run(args: argparse.Namespace) -> int:
     config = load(args.config)
     logging.basicConfig(
         level=config.log_level.upper(),
-        format="%(asctime)s %(levelname)-7s %(name)s: %(message)s",
+        format=logbuffer.FORMAT,
     )
     logging.getLogger("pyVmomi").setLevel(logging.WARNING)
+    logbuffer.install()
     service = AgentService(config)
     signal.signal(signal.SIGTERM, lambda *_: service.stop())
     signal.signal(signal.SIGINT, lambda *_: service.stop())

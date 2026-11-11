@@ -13,15 +13,19 @@ import paho.mqtt.client as mqtt
 from . import __version__
 from .config import AgentConfig, MqttConfig
 from .inventory import build_state, build_view, remember
+from .logbuffer import BUFFER as LOG_BUFFER
 from .operations import Busy, OperationFailed, Orchestrator
 from .protocol import (
     CMD_CANCEL,
     CMD_CLUSTER_SHUTDOWN,
     CMD_CLUSTER_START,
+    CMD_LOGS,
     CMD_REFRESH,
     CMD_SCENARIO_START,
     CMD_SCENARIO_STOP,
     CMD_VM_POWER,
+    LOG_LINES_DEFAULT,
+    LOG_LINES_MAX,
     KIND_INFO,
     KIND_OPERATION,
     KIND_RESULT,
@@ -258,6 +262,11 @@ class AgentService:
                 raise OperationFailed("invalid_request", "vm_id and action required")
             self._orchestrator.vm_power(vm_id, action)
             return {}
+        if kind == CMD_LOGS:
+            count = body.get("lines", LOG_LINES_DEFAULT)
+            if not isinstance(count, int) or isinstance(count, bool):
+                raise OperationFailed("invalid_request", "lines must be a number")
+            return {"lines": LOG_BUFFER.lines(max(1, min(count, LOG_LINES_MAX)))}
         raise OperationFailed("unknown_command", kind)
 
     def _publish_operation(self, operation: dict[str, Any]) -> None:

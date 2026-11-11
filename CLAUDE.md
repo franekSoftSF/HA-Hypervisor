@@ -14,6 +14,9 @@ Polish translations next to English ones.
 ## Rules
 - Always target the newest Home Assistant release. Before a change check the contributors blog for new deprecations
   and bump `hacs.json` (the Marketplace still reads it). Release tags equal the manifest version. `tests/docker/integration.Dockerfile` runs on the real current image.
+- Versioning from 0.10.0: a release normally bumps the patch (0.10.1, 0.10.2, ...) up to at most x.y.20; the release
+  after x.y.20 is the next minor x.(y+1).0. A significant change bumps the minor earlier (patch back to 0), the biggest
+  changes bump the major (x+1.0.0). Propose minor or major to the user and let them decide.
 - `protocol.py` exists twice and must stay byte-identical (tested). Edit one, copy to the other.
 - Commands are never retained, always signed, always expiring. Do not add a queued or retained command path.
 - New error code or step: add to `protocol.py` and to both translation files (tested).

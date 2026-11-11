@@ -53,6 +53,9 @@ CMD_SNAPSHOT_CREATE = "snapshot_create"
 CMD_SNAPSHOT_REVERT = "snapshot_revert"
 CMD_SNAPSHOT_DELETE = "snapshot_delete"
 SNAPSHOT_COMMANDS = (CMD_SNAPSHOT_CREATE, CMD_SNAPSHOT_REVERT, CMD_SNAPSHOT_DELETE)
+CMD_LOGS = "logs"  # answers with the last lines of the agent log
+LOG_LINES_DEFAULT = 500
+LOG_LINES_MAX = 2000
 # Proxmox rules, used on both platforms so a scenario works on either.
 SNAPSHOT_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{1,39}$")
 

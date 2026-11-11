@@ -18,6 +18,7 @@ from .protocol import (
     CMD_CANCEL,
     CMD_CLUSTER_SHUTDOWN,
     CMD_CLUSTER_START,
+    CMD_LOGS,
     CMD_REFRESH,
     CMD_SCENARIO_START,
     CMD_SCENARIO_STOP,
@@ -30,6 +31,7 @@ from .protocol import (
     LEAF_RESULT,
     LEAF_STATE,
     LEAF_STATUS,
+    LOG_LINES_DEFAULT,
     OP_RUNNING,
     PLATFORM_PROXMOX,
     STATUS_ONLINE,
@@ -387,6 +389,10 @@ class AgentLink:
         """Stop the VMs of a scenario."""
         return await self.async_command(CMD_SCENARIO_STOP, {"scenario": scenario})
 
+    async def async_agent_log(self, lines: int = LOG_LINES_DEFAULT) -> list[str]:
+        """Return the last lines of the agent log, oldest first."""
+        result = await self.async_command(CMD_LOGS, {"lines": lines})
+        return [str(line) for line in result.get("lines") or []]
 
 def agent_error_offline() -> HomeAssistantError:
     """Return the error for an agent that is not connected."""
