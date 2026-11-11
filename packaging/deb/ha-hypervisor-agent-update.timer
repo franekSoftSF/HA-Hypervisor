@@ -1,0 +1,12 @@
+[Unit]
+Description=Daily HA Hypervisor agent update
+Documentation=https://github.com/franekSoftSF/HA-Hypervisor
+
+[Timer]
+# Change the time with: ha-hypervisor-agent autoupdate enable --at HH:MM
+OnCalendar=*-*-* 04:00:00
+RandomizedDelaySec=30min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

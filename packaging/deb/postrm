@@ -11,7 +11,8 @@ case "$1" in
         ;;
     purge)
         # The configuration holds the passwords, purge has to take it away.
-        rm -rf "/etc/$NAME" "/var/lib/$NAME"
+        rm -rf "/etc/$NAME" "/var/lib/$NAME" "/var/cache/$NAME" \
+            "/etc/systemd/system/$NAME-update.timer.d"
         if getent passwd "$NAME" >/dev/null; then
             deluser --system --quiet "$NAME" >/dev/null 2>&1 || true
         fi

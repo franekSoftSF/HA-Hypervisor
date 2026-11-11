@@ -1,3 +1,3 @@
 """Agent connecting vCenter, ESXi and server BMCs to Home Assistant over MQTT."""
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"

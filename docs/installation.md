@@ -196,7 +196,7 @@ Packages for Debian 12 or newer and Ubuntu 22.04 or newer, on amd64 and arm64 (R
 brings its own Python and does not touch the system one.
 
 ```bash
-VERSION=0.8.0
+VERSION=0.9.0
 ARCH=$(dpkg --print-architecture)
 wget "https://github.com/franekSoftSF/HA-Hypervisor/releases/download/$VERSION/ha-hypervisor-agent_${VERSION}_$ARCH.deb"
 sudo apt install "./ha-hypervisor-agent_${VERSION}_$ARCH.deb"
@@ -321,6 +321,8 @@ is left. The log should say `Connected to the broker`.
 | `proxmox set`, `proxmox test` | Proxmox VE API token, this makes the agent a Proxmox agent |
 | `node add NAME`, `node list`, `node remove NAME`, `node test [NAME]` | Proxmox nodes, with the same BMC and Wake on LAN options |
 | `--instance NAME` (with any command) | A further agent on the same machine, service `ha-hypervisor-agent@NAME` |
+| `update`, `update --check`, `update --file PATH` | Update the agent, see [Update](#update) |
+| `autoupdate enable`, `autoupdate disable`, `autoupdate status` | Daily automatic update |
 
 Each command has `--help`. Options of `esxi add` include `--address`, `--bmc-type`, `--wol-mac`, `--wol-broadcast`,
 `--no-bmc`, `--no-wol` and `--manual-power-on`.
@@ -463,5 +465,50 @@ Go step by step, ideally when you can reach the server physically:
 
 ## Update
 
-Integration: through the Marketplace. Agent: install the new package with `apt install`, the configuration stays. In
-Docker: `git pull` and `docker compose -f docker-compose.example.yml up -d --build`.
+Integration: through the Marketplace. After it, Home Assistant shows a repair for every agent older than the
+integration.
+
+### Agent from the command line
+
+```bash
+sudo ha-hypervisor-agent update --check
+sudo ha-hypervisor-agent update
+```
+
+`update` downloads the package for this machine (amd64 or arm64) from the latest GitHub release, compares it with the
+`.sha256` file published next to it and installs it. The configuration stays, the running agents, also every
+`ha-hypervisor-agent@NAME`, restart on the new version. `--check` only reports and exits with 100 when a newer release
+exists. `--version X.Y.Z` picks a release; installing the same or an older version needs `--force`.
+
+The update is refused while an agent runs an operation such as a cluster shutdown: the agent would stop in the middle.
+On Proxmox the commands run as root, without `sudo`.
+
+### From a downloaded package
+
+For a machine without internet access, or to keep the file:
+
+```bash
+ha-hypervisor-agent update --download-only --dir /tmp
+sudo ha-hypervisor-agent update --file /tmp/ha-hypervisor-agent_0.9.0_amd64.deb
+```
+
+`--file` also takes a package downloaded by hand from the release page. Keep the `.sha256` file next to it: the
+checksum is then compared before anything is installed. Without it the command warns and installs. It refuses a
+package of another name or architecture.
+
+### Automatic
+
+```bash
+sudo ha-hypervisor-agent autoupdate enable --at 04:30
+ha-hypervisor-agent autoupdate status
+journalctl -u ha-hypervisor-agent-update
+```
+
+A systemd timer runs `update --auto` once a day at the given time (default 04:00, plus up to 30 minutes; a missed run
+happens after the next boot). It installs only a newer release, never the same or an older one, and waits for the next
+day when an operation is running. `autoupdate disable` turns it off. Without systemd, run
+`ha-hypervisor-agent update --auto` from cron as root.
+
+### Docker
+
+`git pull` and `docker compose -f docker-compose.example.yml up -d --build`.

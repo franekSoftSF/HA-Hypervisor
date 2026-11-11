@@ -1,0 +1,10 @@
+[Unit]
+Description=HA Hypervisor agent update
+Documentation=https://github.com/franekSoftSF/HA-Hypervisor
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Latest release only, checked against its .sha256, skipped while an operation runs.
+ExecStart=/usr/bin/ha-hypervisor-agent update --auto

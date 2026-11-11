@@ -40,12 +40,25 @@ journalctl -u $NAME@pve --no-pager -n 30 | grep -q "Connected to the broker"
 test -s /var/lib/$NAME/pve.state.json
 test -s /var/lib/$NAME/state.json
 
+echo "--- automatic updates: off until enabled, the time can be changed"
+test "$(systemctl is-enabled $NAME-update.timer || true)" = "disabled"
+$NAME autoupdate status | grep -q "off"
+$NAME autoupdate enable --at 05:15 | grep -q "daily at 05:15"
+test "$(systemctl is-enabled $NAME-update.timer)" = "enabled"
+test "$(systemctl is-active $NAME-update.timer)" = "active"
+systemctl cat $NAME-update.timer | grep -q "OnCalendar=\*-\*-\* 05:15:00"
+$NAME autoupdate status | grep -q "on, daily at 05:15"
+$NAME autoupdate disable >/dev/null
+test "$(systemctl is-enabled $NAME-update.timer || true)" = "disabled"
+$NAME autoupdate enable >/dev/null
+
 echo "--- stop reports offline, removal stops the service"
 systemctl stop $NAME
 apt-get remove -y -qq $NAME >/dev/null
 test "$(systemctl is-enabled $NAME 2>&1 || true)" != "enabled"
 test "$(systemctl is-active $NAME@pve || true)" != "active"
 test "$(systemctl is-enabled $NAME@pve 2>&1 || true)" != "enabled"
+test "$(systemctl is-enabled $NAME-update.timer 2>&1 || true)" != "enabled"
 test -e /etc/$NAME/config.yaml
 
 echo "SYSTEMD TEST PASSED"

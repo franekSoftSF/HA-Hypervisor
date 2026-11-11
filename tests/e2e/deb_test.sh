@@ -98,6 +98,18 @@ $NAME node test --config $PVE | tee /tmp/node.txt
 grep -q "OK    Proxmox pve: 9.0.10, single node" /tmp/node.txt
 $NAME check --config $PVE
 
+echo "--- update from a downloaded package, checked against its .sha256"
+DEB="/debs/${NAME}_$($NAME --version)_$(dpkg --print-architecture).deb"
+$NAME update --file "$DEB" | grep -q "already installed"
+$NAME update --file "$DEB" --force | tee /tmp/update.txt
+grep -q "Checksum OK" /tmp/update.txt
+test "$($NAME key show)" = "$KEY"
+cp "$DEB" /tmp/broken.deb
+printf 'x' >> /tmp/broken.deb
+sha256sum "$DEB" | sed 's|  .*|  broken.deb|' > /tmp/broken.deb.sha256
+if $NAME update --file /tmp/broken.deb --force 2>/tmp/err.txt; then echo "installed a damaged package"; exit 1; fi
+grep -q "damaged or altered" /tmp/err.txt
+
 echo "--- upgrade keeps the configuration"
 dpkg -i "/debs/${NAME}_"*"_$(dpkg --print-architecture).deb" >/dev/null
 test "$($NAME key show)" = "$KEY"

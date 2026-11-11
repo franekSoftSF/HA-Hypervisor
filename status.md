@@ -1,6 +1,6 @@
 # Status
 
-Version 0.8.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
+Version 0.9.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Supermicro lab (172.16.2.20, vCenter HomeLAB).
 
 ## Done
 - Agent: statistics, VM power, cluster shutdown and start, scenarios, signed MQTT protocol, Redfish, IPMI, WOL.
@@ -19,6 +19,9 @@ Version 0.8.0, built for Home Assistant 2026.11. Agent 0.3.1 runs on the real Su
   for the power button. Compact panel layout: overview row, control grid, one VM list running first.
 - Scenario switch (on starts, off stops), scenario CPU/memory/storage sums, VM usage on the panel tiles.
 - Repairs after every start: agent not answering within a minute, agent older than the integration.
+- Agent self update: `update` downloads the release package for the machine, checks its .sha256 and installs it;
+  `update --file` installs a downloaded package; `autoupdate enable` turns on a daily systemd timer. Updates wait
+  while an operation runs. Not yet tried against the real GitHub releases from a lab machine.
 - Tests in Docker on the real Home Assistant 2026.11 image, hassfest, end-to-end stack with `vcsim`.
 
 ## Not verified on real hardware

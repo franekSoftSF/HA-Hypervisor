@@ -32,6 +32,7 @@ from .config import (
 from .power import HostPower
 from .protocol import generate_key, is_valid_agent_id
 from .service import AgentService, check, check_power, test_mqtt
+from . import update
 from .vim import VimClient, VimError, VimUnavailable
 
 _GROUP = "ha-hypervisor-agent"
@@ -680,6 +681,165 @@ def cmd_run(args: argparse.Namespace) -> int:
     return 0
 
 
+# -------------------------------------------------------------------- update
+
+_UPDATE_TIMER = "ha-hypervisor-agent-update.timer"
+_UPDATE_SCHEDULE = Path("/etc/systemd/system/ha-hypervisor-agent-update.timer.d/schedule.conf")
+_DEFAULT_UPDATE_TIME = "04:00"
+_TIME = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+EXIT_UPDATE_AVAILABLE = 100
+
+
+def _require_root(what: str) -> None:
+    if hasattr(os, "geteuid") and os.geteuid() != 0:
+        raise update.UpdateError(f"{what} needs root: sudo ha-hypervisor-agent {what}")
+
+
+def _allowed(version: str, args: argparse.Namespace) -> bool:
+    """Say why an installation is skipped; a reinstall or downgrade needs --force."""
+    if update.is_newer(version):
+        return True
+    if args.auto:
+        _say(f"Up to date: {__version__}")
+        return False
+    if not args.force:
+        if version == __version__:
+            _say(f"{version} is already installed, --force installs it again")
+        else:
+            _say(f"{version} is older than the installed {__version__}, --force installs it anyway")
+        return False
+    return True
+
+
+def _install(path: Path, version: str, args: argparse.Namespace) -> int:
+    busy = update.running_operations()
+    if busy:
+        message = "an operation is running: " + ", ".join(busy)
+        if args.auto:
+            _say(f"Skipped, {message}. The next run tries again.")
+            return 0
+        if not args.force:
+            raise update.UpdateError(
+                f"{message}. Wait until it ends; --force when the agent is not running at all"
+            )
+    _say(f"Installing {version} (installed {__version__})")
+    update.install(path)
+    _say(f"Updated to {version}. Running agents were restarted.")
+    return 0
+
+
+def cmd_update(args: argparse.Namespace) -> int:
+    """Check, download or install a package."""
+    if args.file and (args.version or args.download_only or args.check or args.auto):
+        raise update.UpdateError("--file installs a downloaded package, use it alone")
+    if args.auto and (args.version or args.download_only or args.check):
+        raise update.UpdateError("--auto installs only the latest release")
+    updater = update.Updater(args.source)
+
+    if args.file:
+        path = Path(args.file)
+        version, checked = update.verify_file(path, updater.arch)
+        if checked:
+            _say(f"Checksum OK: {path.name}")
+        else:
+            _say(f"Warning: no {path.name}.sha256 next to the package, its checksum was not compared")
+        if not _allowed(version, args):
+            return 0
+        _require_root("update")
+        return _install(path, version, args)
+
+    release = updater.release(args.version)
+    if args.check:
+        if update.is_newer(release.version):
+            _say(f"Update available: {__version__} -> {release.version}")
+            _say(f"Install it: {_sudo()}ha-hypervisor-agent update")
+            return EXIT_UPDATE_AVAILABLE
+        _say(f"Up to date: {__version__} (latest release {release.version})")
+        return 0
+    if args.download_only:
+        path = updater.download(release, Path(args.dir))
+        _say(f"Downloaded and verified: {path}")
+        _say(f"Install it: {_sudo()}ha-hypervisor-agent update --file {path}")
+        return 0
+    if not _allowed(release.version, args):
+        return 0
+    _require_root("update")
+    _say(f"Downloading {release.deb_name}")
+    path = updater.download(release, update.CACHE_DIR)
+    try:
+        return _install(path, release.version, args)
+    finally:
+        path.unlink(missing_ok=True)
+        path.with_name(path.name + ".sha256").unlink(missing_ok=True)
+
+
+def _systemctl(*arguments: str) -> subprocess.CompletedProcess[str]:
+    return update.run_command(["systemctl", *arguments])
+
+
+def _require_systemd() -> None:
+    if not Path("/run/systemd/system").is_dir() or not shutil.which("systemctl"):
+        raise update.UpdateError(
+            "automatic updates use a systemd timer; without systemd run "
+            "'ha-hypervisor-agent update --auto' from cron"
+        )
+
+
+def _update_time() -> str:
+    try:
+        text = _UPDATE_SCHEDULE.read_text(encoding="utf-8")
+    except OSError:
+        return _DEFAULT_UPDATE_TIME
+    found = re.search(r"OnCalendar=\*-\*-\* (\d\d:\d\d)", text)
+    return found.group(1) if found else _DEFAULT_UPDATE_TIME
+
+
+def cmd_autoupdate_enable(args: argparse.Namespace) -> int:
+    """Turn on the daily update timer."""
+    _require_systemd()
+    _require_root("autoupdate enable")
+    if args.at is not None:
+        if not _TIME.match(args.at):
+            raise update.UpdateError("--at: use HH:MM, for example 04:30")
+        _UPDATE_SCHEDULE.parent.mkdir(parents=True, exist_ok=True)
+        # The empty OnCalendar= clears the time from the package unit.
+        _UPDATE_SCHEDULE.write_text(
+            f"[Timer]\nOnCalendar=\nOnCalendar=*-*-* {args.at}:00\n", encoding="utf-8"
+        )
+        _systemctl("daemon-reload")
+    result = _systemctl("enable", "--now", _UPDATE_TIMER)
+    if result.returncode != 0:
+        raise update.UpdateError(f"systemctl enable failed: {result.stderr.strip()}")
+    _say(f"Automatic updates on: daily at {_update_time()}, within 30 minutes after it.")
+    _say("An update waits while an operation runs. Log: journalctl -u ha-hypervisor-agent-update")
+    return 0
+
+
+def cmd_autoupdate_disable(_args: argparse.Namespace) -> int:
+    """Turn off the daily update timer."""
+    _require_systemd()
+    _require_root("autoupdate disable")
+    result = _systemctl("disable", "--now", _UPDATE_TIMER)
+    if result.returncode != 0:
+        raise update.UpdateError(f"systemctl disable failed: {result.stderr.strip()}")
+    _say("Automatic updates off. Update by hand: ha-hypervisor-agent update")
+    return 0
+
+
+def cmd_autoupdate_status(_args: argparse.Namespace) -> int:
+    """Show whether the timer is on and when it runs."""
+    _require_systemd()
+    enabled = _systemctl("is-enabled", _UPDATE_TIMER).stdout.strip() == "enabled"
+    if not enabled:
+        _say("Automatic updates: off (turn on: ha-hypervisor-agent autoupdate enable)")
+        return 0
+    _say(f"Automatic updates: on, daily at {_update_time()}")
+    last = _systemctl("show", "-p", "LastTriggerUSec", "--value", _UPDATE_TIMER).stdout.strip()
+    if last and last != "n/a":
+        _say(f"Last run: {last}")
+    return 0
+
+
 # -------------------------------------------------------------------- parser
 
 
@@ -741,7 +901,32 @@ def build_parser() -> argparse.ArgumentParser:
     _add_vcenter(commands, common)
     _add_esxi(commands, common)
     _add_proxmox(commands, common)
+    _add_update(commands)
     return parser
+
+
+def _add_update(commands: Any) -> None:
+    item = commands.add_parser(
+        "update", help="update the agent from the GitHub releases or a downloaded .deb"
+    )
+    item.add_argument("--check", action="store_true", help=f"only report, exit {EXIT_UPDATE_AVAILABLE} when newer exists")
+    item.add_argument("--version", metavar="X.Y.Z", help="this release instead of the latest")
+    item.add_argument("--download-only", action="store_true", help="download and verify, do not install")
+    item.add_argument("--dir", default=".", help="where --download-only saves, default here")
+    item.add_argument("--file", metavar="PATH", help="install a downloaded .deb, checked against PATH.sha256")
+    item.add_argument("--force", action="store_true", help="reinstall, downgrade, or ignore a running operation")
+    item.add_argument("--auto", action="store_true", help="unattended: latest only, skipped while an operation runs")
+    item.add_argument("--source", default=update.RELEASES, help=argparse.SUPPRESS)
+    item.set_defaults(handler=cmd_update)
+
+    group = commands.add_parser("autoupdate", help="daily automatic update").add_subparsers(
+        dest="action", required=True
+    )
+    enable = group.add_parser("enable", help="turn on the daily update")
+    enable.add_argument("--at", metavar="HH:MM", help=f"time of day, default {_DEFAULT_UPDATE_TIME}")
+    enable.set_defaults(handler=cmd_autoupdate_enable)
+    group.add_parser("disable", help="turn it off").set_defaults(handler=cmd_autoupdate_disable)
+    group.add_parser("status", help="show whether it is on").set_defaults(handler=cmd_autoupdate_status)
 
 
 def _add_mqtt(commands: Any, common: argparse.ArgumentParser) -> None:
@@ -871,3 +1056,6 @@ def main(argv: list[str] | None = None) -> int:
         # 2 also tells systemd not to restart a service that cannot work.
         print(f"Configuration error: {err}", file=sys.stderr)  # noqa: T201
         return EXIT_CONFIG
+    except update.UpdateError as err:
+        print(f"Update error: {err}", file=sys.stderr)  # noqa: T201
+        return 1
